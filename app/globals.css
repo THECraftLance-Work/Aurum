@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-accent: #ec3013;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-100: #fff2ef;
+  --color-divider: #e2e8f0;
+
+  --color-neutral-100: #f8fafc;
+  --color-neutral-200: #f1f5f9;
+  --color-neutral-300: #e2e8f0;
+  --color-neutral-400: #cbd5e1;
+  --color-neutral-500: #94a3b8;
+  --color-neutral-600: #64748b;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+}
+
+html,
+body {
+  height: 100%;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-archivo), "Archivo", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: #e2e8f0;
+}
+
+/* Crisp scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@keyframes rmIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-rm-in {
+  animation: rmIn 200ms ease-out both;
+}
+
+/* ---------------------------------------------------------------------------
+   Stagger helper — set `style={{ "--stagger": n }}` on a child of a container
+   using .stagger-children to delay its entrance by n * 45ms.
+   --------------------------------------------------------------------------- */
+.stagger-children > * {
+  animation: rmIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--stagger, 0) * 45ms);
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-sm p-5 transition-[box-shadow,transform,border-color] duration-200 ease-out-quint;
+  }
+  /* Opt-in lift for cards that are clickable or summarise a metric. */
+  .card-hover {
+    @apply hover:shadow-lift hover:-translate-y-0.5 hover:border-slate-300;
+  }
+  .card-interactive {
+    @apply card card-hover cursor-pointer hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150 ease-out-quint disabled:opacity-50 disabled:pointer-events-none cursor-pointer active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1;
+  }
+  .btn-primary {
+    @apply btn bg-[#ec3013] text-white hover:bg-[#dd2b0f] hover:shadow-md shadow-sm focus-visible:ring-[#ec3013]/50;
+  }
+  .btn-secondary {
+    @apply btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm focus-visible:ring-slate-400/50;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-700 hover:bg-slate-100 border border-transparent focus-visible:ring-slate-400/50;
+  }
+  .btn-dark {
+    @apply btn bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md shadow-sm focus-visible:ring-slate-700/50;
+  }
+  .btn-danger {
+    @apply btn bg-rose-600 text-white hover:bg-rose-700 hover:shadow-md shadow-sm focus-visible:ring-rose-500/50;
+  }
+  .btn-success {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-md shadow-sm focus-visible:ring-emerald-500/50;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none transition-all duration-150 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#ec3013] focus:ring-2 focus:ring-red-100;
+  }
+  .label {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 block;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .divider {
+    @apply h-px bg-slate-200 w-full;
+  }
+  /* Was referenced by GlobalSearch but never defined — shortcut hint chip. */
+  .kbd {
+    @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-1.5 font-mono text-[10px] font-medium text-slate-500;
+  }
+
+  /* Modernist Editorial Tables — now inside @layer so ordering is predictable */
+  .table-modern {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .table-modern th {
+    @apply border-b-2 border-[var(--color-divider)] pb-2.5 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-neutral-600;
+  }
+  .table-modern td {
+    @apply border-b border-[var(--color-divider)] py-3 align-middle text-[13.5px];
+  }
+  .table-modern tbody tr:hover {
+    @apply bg-[var(--color-surface)] cursor-pointer;
+  }
+
+  /*
+    Data-table rows: colour shift plus an accent rail on hover.
+
+    The rail is an inset box-shadow on the first cell, NOT a ::before on the
+    <tr>. Generated content and absolute positioning on table-row boxes are
+    unreliable across engines, so the pseudo-element approach renders
+    inconsistently or not at all.
+  */
+  .row-hover {
+    @apply transition-colors duration-150 hover:bg-slate-50;
+  }
+  .row-hover > td:first-child {
+    @apply transition-shadow duration-200 ease-out-quint;
+  }
+  .row-hover:hover > td:first-child {
+    box-shadow: inset 3px 0 0 0 var(--color-accent);
+  }
+
+  /* Truncating table cell — pairs with the <Tooltip> component */
+  .cell-truncate {
+    @apply block max-w-full truncate;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Respect the user's motion preference: keep colour/shadow feedback, drop
+   movement and looping animation.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-hover:hover,
+  .card-interactive:hover {
+    transform: none !important;
+  }
+  .btn:active {
+    transform: none !important;
+  }
+}

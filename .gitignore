@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.local.example
+.env*.local
+.DS_Store
+*.log
+.turbo
+dist
+*docker.env

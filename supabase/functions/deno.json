@@ -1,0 +1,10 @@
+{
+  "//": "Deno config for the Edge Functions. These files are excluded from the root tsconfig.json — Node's TypeScript cannot resolve URL imports or the Deno global. Modules are imported by full specifier, so no import map is needed.",
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window", "esnext"]
+  },
+  "tasks": {
+    "check": "deno check dispatch-notifications/index.ts"
+  }
+}
