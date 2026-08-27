@@ -7,6 +7,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
 import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
+import AttachmentList from "@/components/bookings/AttachmentList";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
 
   // These two have no dependency on each other, so run them together rather
   // than paying two sequential round-trips.
-  const [{ data: payments }, { data: history }] = await Promise.all([
+  const [{ data: payments }, { data: history }, { data: attachments }] = await Promise.all([
     supabase
       .from("payments")
       .select("*, submitter:submitted_by(name, role), reviewer:reviewed_by(name, role)")
@@ -36,7 +37,13 @@ export default async function BookingDetail({ params }: { params: { id: string }
       .eq("entity_type", "booking")
       .eq("entity_id", b.id)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(50),
+    supabase
+      .from("attachments")
+      .select("id, file_name, file_size, mime_type, storage_path, label, created_at, uploader:uploaded_by(name)")
+      .eq("entity_type", "booking")
+      .eq("entity_id", b.id)
+      .order("created_at", { ascending: false })
   ]);
 
   const canReview = ["ACCOUNTANT","ADMIN","DIRECTOR"].includes(user.role) && ["SUBMITTED","UNDER_REVIEW","UPDATED"].includes(b.status);
@@ -73,6 +80,37 @@ export default async function BookingDetail({ params }: { params: { id: string }
               <Info label="Unit"       value={b.unit_number} />
               <Info label="Details"    value={b.property_details ?? "—"} span />
             </div>
+          </div>
+
+          {(b.bank_name || b.bank_account_number || b.loan_sanctioned) && (
+            <div className="card p-5">
+              <h3 className="mb-4 text-sm font-semibold text-slate-900">Bank details</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <Info label="Bank" value={b.bank_name ?? "—"} />
+                <Info label="Branch" value={b.bank_branch ?? "—"} />
+                <Info label="Account holder" value={b.bank_account_holder ?? "—"} />
+                <Info label="Account number" value={b.bank_account_number ?? "—"} />
+                <Info label="IFSC" value={b.bank_ifsc ?? "—"} />
+                <Info
+                  label="Home loan"
+                  value={b.loan_sanctioned
+                    ? `Sanctioned${b.loan_amount ? " · " + formatINR(b.loan_amount) : ""}`
+                    : "Not sanctioned"}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="card p-5">
+            <h3 className="mb-4 text-sm font-semibold text-slate-900">Documents</h3>
+            {/* PostgREST types an embedded to-one relation as an array, so
+                flatten `uploader` to the single row it actually is. */}
+            <AttachmentList
+              attachments={(attachments ?? []).map((a: any) => ({
+                ...a,
+                uploader: Array.isArray(a.uploader) ? a.uploader[0] ?? null : a.uploader ?? null
+              }))}
+            />
           </div>
 
           <div className="card p-5">

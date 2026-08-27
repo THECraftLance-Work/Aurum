@@ -24,7 +24,14 @@ export default function NewBookingForm({ role }: { role: string }) {
     payment_date: new Date().toISOString().slice(0, 10),
     payment_mode: "BANK_TRANSFER",
     reference_no: "",
-    notes: ""
+    notes: "",
+    bank_name: "",
+    bank_account_holder: "",
+    bank_account_number: "",
+    bank_ifsc: "",
+    bank_branch: "",
+    loan_sanctioned: "no",
+    loan_amount: ""
   });
 
   function upd<K extends keyof typeof form>(k: K, v: string) { setForm((f) => ({ ...f, [k]: v })); }
@@ -35,10 +42,14 @@ export default function NewBookingForm({ role }: { role: string }) {
   const totalPaid = previous + current;
   const remaining = Math.max(0, total - totalPaid);
 
+  // Indian IFSC: 4 letters, a literal 0, then 6 alphanumerics.
+  const ifscInvalid = form.bank_ifsc.trim().length > 0
+    && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bank_ifsc.trim());
+
   const valid = useMemo(() => {
-    return form.customer_name && form.project_name && form.unit_number
-      && total > 0 && totalPaid <= total;
-  }, [form, total, totalPaid]);
+    return Boolean(form.customer_name && form.project_name && form.unit_number)
+      && total > 0 && totalPaid <= total && !ifscInvalid;
+  }, [form, total, totalPaid, ifscInvalid]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,8 +68,18 @@ export default function NewBookingForm({ role }: { role: string }) {
           unit_number: form.unit_number.trim(),
           property_details: form.property_details.trim() || null,
           total_property_value: total,
-          notes: form.notes.trim() || null
+          notes: form.notes.trim() || null,
+          bank_name: form.bank_name.trim() || null,
+          bank_account_holder: form.bank_account_holder.trim() || null,
+          bank_account_number: form.bank_account_number.trim() || null,
+          bank_ifsc: form.bank_ifsc.trim() || null,
+          bank_branch: form.bank_branch.trim() || null,
+          loan_sanctioned: form.loan_sanctioned === "yes",
+          loan_amount: form.loan_sanctioned === "yes" && form.loan_amount ? Number(form.loan_amount) : null
         },
+        attachment: doc
+          ? { storagePath: doc.storagePath, name: doc.name, size: doc.size, type: doc.type }
+          : null,
         initialPayment: current > 0 ? {
           amount: current,
           payment_date: form.payment_date,
@@ -92,6 +113,25 @@ export default function NewBookingForm({ role }: { role: string }) {
             <Field label="Unit / flat number *" v={form.unit_number} onChange={(v) => upd("unit_number", v)} />
             <TextArea label="Property details" v={form.property_details} onChange={(v) => upd("property_details", v)} rows={3} full />
           </Grid>
+        </Section>
+
+        <Section title="Bank details">
+          <Grid>
+            <Field label="Bank name" v={form.bank_name} onChange={(v) => upd("bank_name", v)} />
+            <Field label="Branch" v={form.bank_branch} onChange={(v) => upd("bank_branch", v)} />
+            <Field label="Account holder name" v={form.bank_account_holder} onChange={(v) => upd("bank_account_holder", v)} />
+            <Field label="Account number" v={form.bank_account_number} onChange={(v) => upd("bank_account_number", v)} />
+            <Field label="IFSC code" v={form.bank_ifsc} onChange={(v) => upd("bank_ifsc", v.toUpperCase())} />
+            <Select label="Home loan sanctioned" v={form.loan_sanctioned} onChange={(v) => upd("loan_sanctioned", v)} options={["no", "yes"]} />
+            {form.loan_sanctioned === "yes" && (
+              <Field label="Loan amount (₹)" v={form.loan_amount} onChange={(v) => upd("loan_amount", v)} type="number" min={0} step={1} />
+            )}
+          </Grid>
+          {ifscInvalid && (
+            <p className="mt-2 text-xs text-amber-700">
+              IFSC codes are 11 characters: 4 letters, a 0, then 6 alphanumerics (e.g. HDFC0001234).
+            </p>
+          )}
         </Section>
 
         <Section title="Financial details & proof">

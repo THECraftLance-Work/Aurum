@@ -22,10 +22,21 @@ export const whatsappEnv = () => ({
   locale: get("WHATSAPP_TEMPLATE_LOCALE", "en")
 });
 
-export const gmailEnv = () => ({
-  user: get("GMAIL_USER"),
-  appPassword: get("GMAIL_APP_PASSWORD"),
-  fromName: get("GMAIL_FROM_NAME", "Aurum Ops")
+/**
+ * Generic SMTP — works with Gmail, your host's mail server, Zoho, an internal
+ * relay, anything.
+ *
+ * SMTP_SECURE must match the port: 465 => true (implicit TLS),
+ * 587 => false (STARTTLS upgrade). Mismatching them is the most common cause of
+ * a connection that hangs and then times out.
+ */
+export const smtpEnv = () => ({
+  host: get("SMTP_HOST"),
+  port: Number(get("SMTP_PORT", "465")),
+  secure: get("SMTP_SECURE", "true") === "true",
+  user: get("SMTP_USER"),
+  password: get("SMTP_PASSWORD"),
+  from: get("SMTP_FROM")
 });
 
 /** Real driver only when credentials exist AND we're not in dry-run. */
@@ -35,8 +46,8 @@ export function whatsappConfigured() {
   return Boolean(e.phoneNumberId && e.accessToken);
 }
 
-export function emailConfigured() {
+export function smtpConfigured() {
   if (isDryRun()) return false;
-  const e = gmailEnv();
-  return Boolean(e.user && e.appPassword);
+  const e = smtpEnv();
+  return Boolean(e.host && e.user && e.password);
 }

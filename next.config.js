@@ -2,10 +2,16 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  compiler: {
-    // Strip console.* from production builds (keeps error/warn for diagnostics)
-    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false
-  },
+  // Production-only so `next dev --turbo` isn't flagged as unsupported
+  // (removeConsole is a webpack/SWC build feature; Turbopack dev ignores it).
+  ...(process.env.NODE_ENV === "production"
+    ? {
+        compiler: {
+          // Strip console.* from production builds (keeps error/warn for diagnostics)
+          removeConsole: { exclude: ["error", "warn"] }
+        }
+      }
+    : {}),
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
     // Tree-shake barrel imports so a page importing 9 icons doesn't pull the

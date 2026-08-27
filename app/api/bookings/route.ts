@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { customer, booking, initialPayment, previousPayments } = body ?? {};
+  const { customer, booking, initialPayment, previousPayments, attachment } = body ?? {};
 
   if (!customer?.name || !booking?.project_name || !booking?.unit_number || !booking?.total_property_value) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
@@ -56,6 +56,13 @@ export async function POST(req: Request) {
       property_details: booking.property_details ?? null,
       total_property_value: totalValue,
       notes: booking.notes ?? null,
+      bank_name: booking.bank_name ?? null,
+      bank_account_holder: booking.bank_account_holder ?? null,
+      bank_account_number: booking.bank_account_number ?? null,
+      bank_ifsc: booking.bank_ifsc ?? null,
+      bank_branch: booking.bank_branch ?? null,
+      loan_sanctioned: Boolean(booking.loan_sanctioned),
+      loan_amount: booking.loan_amount ?? null,
       status: "SUBMITTED",
       created_by: profile.id,
       creator_role: profile.role,
@@ -92,6 +99,24 @@ export async function POST(req: Request) {
       status: "PENDING",
       submitted_by: profile.id
     });
+  }
+
+  // 4b. Link the uploaded document. The file is already in Storage (the
+  //     browser uploads on select); this records what it belongs to.
+  if (attachment?.storagePath) {
+    const { error: attErr } = await admin.from("attachments").insert({
+      entity_type: "booking",
+      entity_id: bk.id,
+      storage_path: attachment.storagePath,
+      file_name: attachment.name ?? "document",
+      file_size: Number(attachment.size ?? 0) || 1,
+      mime_type: attachment.type ?? "application/octet-stream",
+      label: "Booking agreement / payment proof",
+      uploaded_by: profile.id
+    });
+    // A failed attachment link must not fail the booking — the booking is the
+    // record of value, and the orphaned object is recoverable.
+    if (attErr) console.error("[bookings] attachment link failed", attErr.message);
   }
 
   // 5. Notify accountants

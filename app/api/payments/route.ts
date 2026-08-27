@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from("app_users").select("id, role, status, name").eq("id", user.id).maybeSingle();
   if (!profile || profile.status !== "APPROVED") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { booking_id, amount, payment_date, payment_mode, reference_no } = await req.json();
+  const { booking_id, amount, payment_date, payment_mode, reference_no, attachment } = await req.json();
   if (!booking_id || !amount || !payment_date || !payment_mode) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
   const admin = createSupabaseAdmin();
@@ -49,6 +49,23 @@ export async function POST(req: Request) {
     submitted_by: profile.id
   }).select("id").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Link the uploaded receipt. Previously the client posted `document_proof`
+  // and this route never destructured it, so every payment receipt was
+  // silently discarded.
+  if (attachment?.storagePath) {
+    const { error: attErr } = await admin.from("attachments").insert({
+      entity_type: "payment",
+      entity_id: p.id,
+      storage_path: attachment.storagePath,
+      file_name: attachment.name ?? "receipt",
+      file_size: Number(attachment.size ?? 0) || 1,
+      mime_type: attachment.type ?? "application/octet-stream",
+      label: "Payment receipt",
+      uploaded_by: profile.id
+    });
+    if (attErr) console.error("[payments] attachment link failed", attErr.message);
+  }
 
   await notifyRole("ACCOUNTANT", {
     category: "PAYMENT",

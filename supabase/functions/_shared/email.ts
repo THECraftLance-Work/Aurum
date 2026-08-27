@@ -1,38 +1,42 @@
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "npm:nodemailer@^6.9.14";
 import type { SendResult } from "./types.ts";
-import { emailConfigured, gmailEnv } from "./env.ts";
+import { smtpConfigured, smtpEnv } from "./env.ts";
 
 /**
- * Gmail SMTP, replacing Resend.
+ * Plain SMTP via nodemailer.
  *
- * Port 465 with implicit TLS — NOT 587. Supabase's docs used to claim outbound
- * 25/465/587 were all blocked; that was inaccurate for 465 and has since been
- * corrected (supabase/supabase#21977). 587 is STARTTLS and is not a safe
- * assumption here, so we pin 465.
+ * nodemailer, not denomailer: denomailer fails on `Deno.connectTls` inside edge
+ * runtimes, and nodemailer over Deno's npm-compat layer is what Supabase's own
+ * `send-email-smtp` example ships. Works with any SMTP server — Gmail, your
+ * host's mail server, Zoho, Fastmail, an internal relay.
  *
- * Auth is a 16-character Google App Password, which requires 2-Step
- * Verification on the account. Limits: 500 recipients/day on free Gmail,
- * 2,000 on Workspace, 100 recipients per message on either.
+ * Port 465 => secure: true (implicit TLS). Port 587 => secure: false, and
+ * nodemailer upgrades via STARTTLS. Getting this pair wrong is the single most
+ * common cause of a connection that hangs and then times out.
  */
 
-/** SMTP reply codes in the 5xx range are permanent; 4xx are transient. */
-function classifySmtpError(message: string): boolean {
-  const m = message.toLowerCase();
+/** 5xx SMTP replies are permanent; 4xx are transient. */
+function classifySmtpError(err: unknown): { code: string; message: string; retryable: boolean } {
+  const e = err as { code?: string; responseCode?: number; message?: string };
+  const message = String(e?.message ?? err);
+  const responseCode = e?.responseCode;
+  const code = e?.code ?? (responseCode ? String(responseCode) : "SMTP_ERROR");
 
-  // Authentication failures never fix themselves on retry — the App Password
-  // is wrong, revoked, or 2FA was turned off on the account.
-  if (m.includes("535") || m.includes("invalid login") || m.includes("username and password not accepted")) {
-    return false;
+  // Authentication failures never fix themselves on retry: wrong password,
+  // revoked App Password, or 2FA turned off on the account.
+  if (responseCode === 535 || responseCode === 534 || /invalid login|username and password not accepted|authentication failed/i.test(message)) {
+    return { code: "SMTP_AUTH", message, retryable: false };
   }
-  // Bad recipient address.
-  if (m.includes("550") || m.includes("553") || m.includes("no such user")) return false;
-
-  // Rate limiting / temporary deferral — worth retrying.
-  if (m.includes("421") || m.includes("450") || m.includes("451") || m.includes("452")) return true;
-  if (m.includes("rate") || m.includes("too many") || m.includes("try again")) return true;
-
-  // Connection-level problems are transient by default.
-  return true;
+  // Bad recipient.
+  if (responseCode === 550 || responseCode === 553 || responseCode === 501) {
+    return { code: String(responseCode), message, retryable: false };
+  }
+  // Any other permanent 5xx.
+  if (responseCode && responseCode >= 500 && responseCode < 600) {
+    return { code: String(responseCode), message, retryable: false };
+  }
+  // Transient: 4xx deferrals, rate limits, DNS/connection problems, timeouts.
+  return { code, message, retryable: true };
 }
 
 export async function sendEmail(input: {
@@ -41,46 +45,46 @@ export async function sendEmail(input: {
   html: string;
   text: string;
 }): Promise<SendResult> {
-  if (!emailConfigured()) {
+  if (!smtpConfigured()) {
     console.info("[worker:email:noop]", JSON.stringify({ to: input.to, subject: input.subject }));
     return { ok: true, provider: "noop", providerMessageId: null, skipped: true };
   }
 
-  const { user, appPassword, fromName } = gmailEnv();
-  let client: SMTPClient | null = null;
+  const { host, port, secure, user, password, from } = smtpEnv();
+  let transport: ReturnType<typeof nodemailer.createTransport> | null = null;
 
   try {
-    client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: { username: user, password: appPassword }
-      }
+    transport = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass: password },
+      // Edge isolates are short-lived; don't wait forever on a wedged socket.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000
     });
 
-    await client.send({
-      from: `${fromName} <${user}>`,
-      to: input.to,
+    const info = await transport.sendMail({
+      from: from || user,
+      to: input.to.join(", "),
       subject: input.subject,
-      content: input.text,
+      text: input.text,
       html: input.html
     });
 
-    // SMTP gives us no provider-side message id to record.
-    return { ok: true, provider: "gmail_smtp", providerMessageId: null };
-  } catch (err) {
-    const message = String((err as Error)?.message ?? err);
     return {
-      ok: false,
-      provider: "gmail_smtp",
-      errorCode: "SMTP_ERROR",
-      errorMessage: message,
-      retryable: classifySmtpError(message)
+      ok: true,
+      provider: "smtp",
+      providerMessageId: (info as { messageId?: string })?.messageId ?? null
     };
+  } catch (err) {
+    const { code, message, retryable } = classifySmtpError(err);
+    console.error("[worker:email] send failed", code, message);
+    return { ok: false, provider: "smtp", errorCode: code, errorMessage: message, retryable };
   } finally {
-    // Leaking the connection wedges the isolate and eventually trips Gmail's
+    // Leaking the pool wedges the isolate and eventually trips the server's
     // concurrent-connection limit.
-    try { await client?.close(); } catch { /* already closed */ }
+    try { transport?.close(); } catch { /* already closed */ }
   }
 }

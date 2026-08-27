@@ -46,7 +46,9 @@ export default function AddPaymentForm({ bookingId, maxAmount }: { bookingId: st
           payment_date: date,
           payment_mode: mode,
           reference_no: ref || null,
-          document_proof: file ? { name: file.name, size: file.size, type: file.type } : null
+          attachment: file
+            ? { storagePath: file.storagePath, name: file.name, size: file.size, type: file.type }
+            : null
         })
       });
 

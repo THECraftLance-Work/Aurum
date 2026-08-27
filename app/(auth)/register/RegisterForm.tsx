@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
-import FileUpload, { type UploadedFile } from "@/components/ui/FileUpload";
 
 const ROLES = [
   { value: "SM", label: "Sales Manager" },
@@ -15,7 +14,6 @@ const ROLES = [
 export default function RegisterForm() {
   const router = useRouter();
   const supabase = createSupabaseBrowser();
-  const [doc, setDoc] = useState<UploadedFile | null>(null);
   const [form, setForm] = useState({
     name: "", email: "", phone: "", employee_id: "",
     requested_role: "SM", password: "", confirm: ""
@@ -93,14 +91,13 @@ export default function RegisterForm() {
           <label className="label">Confirm password</label>
           <input className="input" type="password" required minLength={8} value={form.confirm} onChange={(e) => update("confirm", e.target.value)} placeholder="••••••••" />
         </div>
-        <div className="col-span-2">
-          <FileUpload
-            label="ID proof / Authorization document (Optional)"
-            helper="Upload employee ID, Aadhaar or RERA cert (PDF, PNG, JPG)"
-            onFileSelect={(f) => setDoc(f)}
-            value={doc}
-          />
-        </div>
+        {/*
+          The ID-proof upload was removed here. It never persisted anything,
+          and it cannot work on this page: registration is pre-auth, so there
+          is no user id to key the storage path against (Storage RLS requires
+          `<user-id>/...`). Supporting it needs a deferred upload after sign-in
+          plus a 'user' entity type on attachments — ask if you want that.
+        */}
       </div>
 
       {error && <div className="border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</div>}
