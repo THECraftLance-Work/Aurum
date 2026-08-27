@@ -137,3 +137,57 @@ export function buildPaymentEmail(d: PaymentAlertData) {
     ].join("\n")
   };
 }
+
+export function buildBookingCreatedEmail(d: BookingAlertData) {
+  const href = `${appUrl()}/bookings/${d.bookingUuid}`;
+  const rows: [string, string][] = [
+    ["Booking Reference", d.bookingRef],
+    ["Customer Name", d.customerName],
+    ["Project", d.project],
+    ["Unit Number", d.unit],
+    ["Property Value", formatINRRich(d.totalValue)],
+    ["Booking Date", new Date().toLocaleDateString("en-IN", { dateStyle: "long" })],
+    ["Submitted by", d.submitterName],
+    ["Status", "Submitted for Verification"]
+  ];
+  return {
+    subject: `Booking Confirmed: ${d.bookingRef} - ${d.project} / ${d.unit}`,
+    html: shell("Your Booking has been Submitted", rows, href, "View Booking Details"),
+    text: [
+      `Dear ${d.customerName},`,
+      ``,
+      `Your booking has been successfully submitted by ${d.submitterName}.`,
+      `Here are the details:`,
+      ``,
+      ...rows.map(([k, v]) => `${k}: ${v}`),
+      ``,
+      `Your booking is now under verification by our accounts team.`,
+      `You will receive updates once the verification is complete.`,
+      ``,
+      `View your booking: ${href}`,
+      ``,
+      `Thank you for choosing Aurum Real Estate.`,
+      `If you have any questions, please contact your sales representative.`
+    ].join("\n")
+  };
+}
+
+export function buildWelcomeEmail(userName: string, userEmail: string, userRole: string) {
+  const href = appUrl();
+  const rows: [string, string][] = [
+    ["Name", userName],
+    ["Email", userEmail],
+    ["Role", userRole],
+    ["Platform", "Aurum Real Estate Operations"]
+  ];
+  return {
+    subject: `Welcome to Aurum Real Estate Operations Platform`,
+    html: shell("Welcome to Aurum Ops!", rows, href, "Access Dashboard"),
+    text: [
+      `Welcome to Aurum Real Estate Operations Platform, ${userName}!`,
+      `Your account has been set up with the role: ${userRole}`,
+      `You can now access the platform at: ${href}`,
+      `If you have any questions, please contact your administrator.`
+    ].join("\n")
+  };
+}

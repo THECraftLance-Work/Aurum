@@ -1,9 +1,10 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRecipients } from "./recipients";
 import { whatsappEnv } from "./env";
+import { isEmail } from "./phone";
 import {
   bookingWhatsAppParams, paymentWhatsAppParams, bookingDeepLinkParam,
-  buildBookingEmail, buildPaymentEmail
+  buildBookingEmail, buildPaymentEmail, buildBookingCreatedEmail
 } from "./templates";
 import type { OutboundEvent } from "./types";
 
@@ -38,6 +39,22 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
       });
     }
+
+    // Customer-facing confirmation email
+    if (d.customerEmail && isEmail(d.customerEmail)) {
+      const customerMail = buildBookingCreatedEmail(d);
+      rows.push({
+        event_key: "BOOKING_CREATED_CUSTOMER",
+        channel: "EMAIL",
+        recipient: d.customerEmail,
+        entity_type: "booking",
+        entity_id: event.entityId,
+        subject: customerMail.subject,
+        payload: { html: customerMail.html, text: customerMail.text },
+        dedupe_key: `BOOKING_CREATED_CUSTOMER:${event.entityId}:EMAIL:${d.customerEmail}`
+      });
+    }
+
     for (const to of rec.whatsapp) {
       rows.push({
         event_key: event.key, channel: "WHATSAPP", recipient: to,

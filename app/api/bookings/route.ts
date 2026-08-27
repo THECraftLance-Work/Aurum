@@ -150,6 +150,7 @@ export async function POST(req: Request) {
       bookingUuid: bk.id,
       submitterName: profile.name,
       customerName: customer.name,
+      customerEmail: customer.email ?? null,
       project: booking.project_name,
       unit: booking.unit_number,
       totalValue

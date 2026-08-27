@@ -7,6 +7,7 @@ export type BookingAlertData = {
   bookingUuid: string;
   submitterName: string;
   customerName: string;
+  customerEmail: string | null;
   project: string;
   unit: string;
   totalValue: number;

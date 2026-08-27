@@ -8,3 +8,8 @@ node_modules
 .turbo
 dist
 *docker.env
+tsconfig.tsbuildinfo
+.supabase/.temp
+.supabase/.branches
+.claude
+unwanted
