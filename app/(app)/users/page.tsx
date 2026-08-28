@@ -44,7 +44,7 @@ export default async function UsersPage() {
               return (
                 <tr key={u.id} className="border-t border-border">
                   <td className="px-5 py-3">
-                    <Link href={`/u/${u.id}`} className="flex items-center gap-3 group">
+                    <Link href={`/users/${u.id}`} className="flex items-center gap-3 group">
                       <div className={cn("grid h-9 w-9 place-items-center rounded-full text-white font-semibold transition group-hover:ring-2 group-hover:ring-offset-1", accent.dot, accent.ring)}>
                         {u.name.split(" ").slice(0,2).map((s: string) => s[0]?.toUpperCase()).join("")}
                       </div>
@@ -65,7 +65,7 @@ export default async function UsersPage() {
                   <td className="px-5 py-3 text-slate-500">{formatDate(u.created_at)}</td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Link href={`/u/${u.id}`} target="_blank" title="Open shareable profile (no login, Unique ID)" className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                      <Link href={`/users/${u.id}`} title="Open profile (director view, Unique ID)" className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                         <Eye className="h-3.5 w-3.5" /> View
                       </Link>
                       <UserActionRow

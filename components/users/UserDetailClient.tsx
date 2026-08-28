@@ -134,17 +134,17 @@ export default function UserDetailClient({
   bookings,
   tickets,
   docUrls,
+  embedded = false,
 }: {
   user: UserRow;
   bookings: BookingRow[];
   tickets: TicketRow[];
   docUrls: DocUrl[];
+  embedded?: boolean;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
   const [copied, setCopied] = useState(false);
-  const [openBooking, setOpenBooking] = useState<string | null>(
-    bookings[0]?.id ?? null,
-  );
+  const [openBooking, setOpenBooking] = useState<string | null>(null);
   const [docBusy, setDocBusy] = useState<string | null>(null);
 
   const accent = roleAccent[user.role] ?? roleAccent.SM;
@@ -177,51 +177,52 @@ export default function UserDetailClient({
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f7f5]">
-      {/* Top bar — not inside AppShell, so show Aurum branding */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#ec3013] text-sm font-extrabold tracking-tight text-white">
-              A
-            </span>
-            <span className="text-sm font-bold tracking-tight text-slate-900">
-              Aurum
-            </span>
-            <span className="hidden text-xs font-medium text-slate-400 sm:inline">
-              Real Estate
-            </span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={copyLink}
-              className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              {copied ? (
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-              ) : (
-                <Share2 className="h-3.5 w-3.5" />
-              )}
-              {copied ? "Copied" : "Share link"}
-            </button>
-            <Link
-              href="/login"
-              className="hidden h-8 items-center rounded-xl bg-slate-900 px-3.5 text-xs font-semibold text-white hover:bg-slate-800 sm:inline-flex"
-            >
-              Sign in
+    <div className={cn(embedded ? "" : "min-h-screen bg-[#f8f7f5]")}>
+      {!embedded && (
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur">
+          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+            <Link href="/" className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#ec3013] text-sm font-extrabold tracking-tight text-white">
+                A
+              </span>
+              <span className="text-sm font-bold tracking-tight text-slate-900">
+                Aurum
+              </span>
+              <span className="hidden text-xs font-medium text-slate-400 sm:inline">
+                Real Estate
+              </span>
             </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyLink}
+                className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                ) : (
+                  <Share2 className="h-3.5 w-3.5" />
+                )}
+                {copied ? "Copied" : "Share link"}
+              </button>
+              <Link
+                href="/login"
+                className="hidden h-8 items-center rounded-xl bg-slate-900 px-3.5 text-xs font-semibold text-white hover:bg-slate-800 sm:inline-flex"
+              >
+                Sign in
+              </Link>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Hero */}
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
           <Link
-            href="/"
+            href={embedded ? "/users" : "/"}
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Aurum
+            <ArrowLeft className="h-3.5 w-3.5" /> {embedded ? "Back to Users" : "Back to Aurum"}
           </Link>
 
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -271,7 +272,7 @@ export default function UserDetailClient({
                     </span>
                   )}
                 </p>
-                <p className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" /> Joined{" "}
                     {formatDate(user.created_at)}
@@ -279,11 +280,11 @@ export default function UserDetailClient({
                   {user.approved_at && (
                     <span>· Approved {formatDate(user.approved_at)}</span>
                   )}
-                  <span className="inline-flex items-center gap-1">
-                    <Shield className="h-3.5 w-3.5" /> {user.auth_provider}
-                  </span>
-                  <span className="hidden sm:inline">
-                    · ID {user.id.slice(0, 8)}
+                  <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold text-slate-600 bg-white">
+                    <Shield className="h-3 w-3" />{" "}
+                    {user.auth_provider === "GOOGLE"
+                      ? "Verified by Google"
+                      : "Verified by Aurum System"}
                   </span>
                 </p>
               </div>
@@ -301,9 +302,6 @@ export default function UserDetailClient({
                 )}
                 {copied ? "Link copied" : "Copy profile link"}
               </button>
-              <span className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500">
-                Unique ID · {user.id.slice(0, 8)}…{user.id.slice(-4)}
-              </span>
             </div>
           </div>
         </div>
@@ -361,16 +359,6 @@ export default function UserDetailClient({
             {TABS.map((t) => {
               const Icon = t.icon;
               const active = tab === t.id;
-              const count =
-                t.id === "bookings"
-                  ? bookings.length
-                  : t.id === "payments"
-                    ? allPayments.length
-                    : t.id === "tickets"
-                      ? tickets.length
-                      : t.id === "documents"
-                        ? docUrls.length
-                        : undefined;
               return (
                 <button
                   key={t.id}
@@ -383,18 +371,6 @@ export default function UserDetailClient({
                   )}
                 >
                   <Icon className="h-4 w-4" /> {t.label}
-                  {count !== undefined && (
-                    <span
-                      className={cn(
-                        "ml-1 rounded-full px-1.5 py-0.5 text-xs",
-                        active
-                          ? "bg-white/20 text-white"
-                          : "bg-white text-slate-700",
-                      )}
-                    >
-                      {count}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -769,10 +745,11 @@ export default function UserDetailClient({
           ))}
       </div>
 
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
-        Aurum Real Estate Operations · Shareable profile — Unique ID {user.id} ·
-        No login required
-      </footer>
+      {!embedded && (
+        <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
+          Aurum Real Estate Operations · Shareable profile — No login required
+        </footer>
+      )}
     </div>
   );
 }
@@ -797,15 +774,16 @@ function Stat({
         ? "text-amber-700"
         : "text-slate-900";
   return (
-    <div className="card p-4">
+    <div className="card p-4 min-w-0 overflow-hidden">
       <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-        <Icon className="h-3.5 w-3.5" /> {label}
+        <Icon className="h-3.5 w-3.5 shrink-0" /> {label}
       </div>
       <div
         className={cn(
-          "mt-1 truncate text-base font-bold tabular-nums sm:text-lg",
+          "mt-1 text-sm font-bold tabular-nums sm:text-base break-words leading-tight",
           toneCls,
         )}
+        title={value}
       >
         {value}
       </div>
@@ -871,22 +849,22 @@ function BookingCard({
               {b.customer?.name ?? "—"}
             </span>
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-xs sm max-w-sm">
-            <span>
-              <span className="text-slate-500">Value</span>
-              <span className="ml-1 font-semibold tabular-nums">
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs sm:max-w-sm">
+            <span className="min-w-0 break-words">
+              <span className="text-slate-500 block sm:inline">Value</span>
+              <span className="font-semibold tabular-nums break-words sm:ml-1 block sm:inline">
                 {formatINR(b.total_property_value)}
               </span>
             </span>
-            <span>
-              <span className="text-slate-500">Paid</span>
-              <span className="ml-1 font-semibold tabular-nums text-emerald-700">
+            <span className="min-w-0 break-words">
+              <span className="text-slate-500 block sm:inline">Paid</span>
+              <span className="font-semibold tabular-nums text-emerald-700 break-words sm:ml-1 block sm:inline">
                 {formatINR(b.total_amount_paid)}
               </span>
             </span>
-            <span>
-              <span className="text-slate-500">Due</span>
-              <span className="ml-1 font-semibold tabular-nums text-amber-700">
+            <span className="min-w-0 break-words">
+              <span className="text-slate-500 block sm:inline">Due</span>
+              <span className="font-semibold tabular-nums text-amber-700 break-words sm:ml-1 block sm:inline">
                 {formatINR(b.remaining_balance)}
               </span>
             </span>
@@ -935,26 +913,26 @@ function BookingCard({
                 )}
               </div>
             </div>
-            <div className="card p-4">
+            <div className="card p-4 min-w-0 overflow-hidden">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Financial
               </h4>
               <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs text-slate-500">Value</div>
-                  <div className="font-semibold tabular-nums">
+                  <div className="font-semibold tabular-nums break-words text-xs sm:text-sm">
                     {formatINR(b.total_property_value)}
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs text-slate-500">Paid</div>
-                  <div className="font-semibold tabular-nums text-emerald-700">
+                  <div className="font-semibold tabular-nums text-emerald-700 break-words text-xs sm:text-sm">
                     {formatINR(b.total_amount_paid)}
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs text-slate-500">Due</div>
-                  <div className="font-semibold tabular-nums text-amber-700">
+                  <div className="font-semibold tabular-nums text-amber-700 break-words text-xs sm:text-sm">
                     {formatINR(b.remaining_balance)}
                   </div>
                 </div>
