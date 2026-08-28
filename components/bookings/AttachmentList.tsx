@@ -1,9 +1,6 @@
 "use client";
-import { useState } from "react";
-import { FileText, Image as ImageIcon, Download, Loader2 } from "lucide-react";
-import { createSupabaseBrowser } from "@/lib/supabase/client";
+import { FileText, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { formatDateTime } from "@/lib/utils/format";
-import { useToast } from "@/components/ui/Toast";
 
 type Attachment = {
   id: string;
@@ -22,37 +19,17 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Documents open through /api/documents/[id], which authorises the request and
+ * streams the file.
+ *
+ * This used to mint a Supabase signed URL on click. That URL carries a JWT with
+ * an `exp` claim, so reloading the tab, scrolling a PDF (which issues fresh
+ * Range requests) or coming back to it later failed with
+ * `InvalidJWT: "exp" claim timestamp check failed`. A plain link to our own
+ * endpoint has no deadline and stays valid for as long as the user may see it.
+ */
 export default function AttachmentList({ attachments }: { attachments: Attachment[] }) {
-  const supabase = createSupabaseBrowser();
-  const { toast } = useToast();
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  /**
-   * The bucket is private, so there is no permanent URL to link to. We mint a
-   * short-lived signed URL on click — which also means Storage RLS is checked
-   * at that moment, not at render.
-   */
-  async function open(a: Attachment) {
-    setBusyId(a.id);
-    try {
-      const { data, error } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(a.storage_path, 60);
-
-      if (error || !data?.signedUrl) {
-        toast({
-          tone: "error",
-          title: "Could not open the document",
-          description: error?.message ?? "The file may have been removed."
-        });
-        return;
-      }
-      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   if (attachments.length === 0) {
     return <p className="text-sm text-slate-500">No documents attached.</p>;
   }
@@ -63,10 +40,11 @@ export default function AttachmentList({ attachments }: { attachments: Attachmen
         const isImage = a.mime_type.startsWith("image/");
         return (
           <li key={a.id}>
-            <button
-              onClick={() => open(a)}
-              disabled={busyId === a.id}
-              className="flex w-full items-center gap-3 rounded-xl border border-border px-3.5 py-2.5 text-left transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60"
+            <a
+              href={`/api/documents/${a.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center gap-3 rounded-xl border border-border px-3.5 py-2.5 text-left transition-all duration-150 hover:border-slate-300 hover:bg-slate-50"
             >
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
                 {isImage ? <ImageIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
@@ -78,10 +56,8 @@ export default function AttachmentList({ attachments }: { attachments: Attachmen
                   {a.uploader?.name ? ` · ${a.uploader.name}` : ""}
                 </div>
               </div>
-              {busyId === a.id
-                ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" />
-                : <Download className="h-4 w-4 shrink-0 text-slate-400" />}
-            </button>
+              <ExternalLink className="h-4 w-4 shrink-0 text-slate-400" />
+            </a>
           </li>
         );
       })}

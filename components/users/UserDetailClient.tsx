@@ -175,15 +175,17 @@ export default function UserDetailClient({
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }
-  async function openDoc(id: string) {
-    setDocBusy(id);
-    try {
-      const res = await fetch(`/api/documents/${id}`);
-      const j = await res.json();
-      if (j.signedUrl) window.open(j.signedUrl, "_blank");
-    } finally {
-      setDocBusy(null);
-    }
+  /**
+   * Opens the document endpoint directly.
+   *
+   * This used to fetch a Supabase signed URL first and open that. The signed
+   * URL carries a JWT with an `exp` claim, so reloading the tab or scrolling a
+   * PDF (fresh Range requests) failed with
+   * `InvalidJWT: "exp" claim timestamp check failed`. The endpoint authorises
+   * and streams the file itself, so there is no deadline and no round-trip.
+   */
+  function openDoc(id: string) {
+    window.open(`/api/documents/${id}`, "_blank", "noopener,noreferrer");
   }
 
   return (
