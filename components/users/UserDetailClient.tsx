@@ -31,9 +31,6 @@ import {
   ChevronDown,
   ArrowLeft,
   Sparkles,
-  TrendingUp,
-  Clock,
-  FileCheck,
 } from "lucide-react";
 
 export type DocUrl = {
@@ -118,6 +115,8 @@ const TABS = [
   { id: "documents", label: "Documents", icon: Paperclip },
 ] as const;
 
+type TabId = (typeof TABS)[number]["id"];
+
 function fileIcon(mime: string) {
   if (mime.includes("pdf")) return "📄";
   if (mime.includes("image")) return "🖼️";
@@ -157,7 +156,18 @@ export default function UserDetailClient({
     0,
   );
   const totalRemaining = totalValue - totalPaid;
+
   const allPayments = bookings.flatMap((b) => b.payments);
+
+  // Counts rendered as badges on the tab bar, replacing the six stat cards.
+  // `null` means the tab shows no badge (Overview isn't a collection).
+  const tabCounts: Record<TabId, number | null> = {
+    overview: null,
+    bookings: bookings.length,
+    payments: allPayments.length,
+    tickets: tickets.length,
+    documents: docUrls.length,
+  };
 
   async function copyLink() {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -180,7 +190,7 @@ export default function UserDetailClient({
     <div className={cn(embedded ? "" : "min-h-screen bg-[#f8f7f5]")}>
       {!embedded && (
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur">
-          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="mx-auto flex h-14 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-2.5">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#ec3013] text-sm font-extrabold tracking-tight text-white">
                 A
@@ -205,10 +215,10 @@ export default function UserDetailClient({
                 {copied ? "Copied" : "Share link"}
               </button>
               <Link
-                href="/login"
+                href="/dashboard"
                 className="hidden h-8 items-center rounded-xl bg-slate-900 px-3.5 text-xs font-semibold text-white hover:bg-slate-800 sm:inline-flex"
               >
-                Sign in
+                Dashboard
               </Link>
             </div>
           </div>
@@ -217,7 +227,7 @@ export default function UserDetailClient({
 
       {/* Hero */}
       <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           <Link
             href={embedded ? "/users" : "/"}
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700"
@@ -307,79 +317,65 @@ export default function UserDetailClient({
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat
-            label="Bookings"
-            value={String(bookings.length)}
-            sub="submitted"
-            icon={Building2}
-          />
-          <Stat
-            label="Total value"
-            value={formatINR(totalValue)}
-            sub="portfolio"
-            icon={TrendingUp}
-            tone="slate"
-          />
-          <Stat
-            label="Total paid"
-            value={formatINR(totalPaid)}
-            sub="verified"
-            icon={Wallet}
-            tone="emerald"
-          />
-          <Stat
-            label="Remaining"
-            value={formatINR(totalRemaining)}
-            sub="pending"
-            icon={Clock}
-            tone="amber"
-          />
-          <Stat
-            label="Payments"
-            value={String(allPayments.length)}
-            sub="entries"
-            icon={FileCheck}
-          />
-          <Stat
-            label="Tickets"
-            value={String(tickets.length)}
-            sub="raised"
-            icon={Ticket}
-          />
-        </div>
-      </div>
-
-      {/* Tabs */}
+      {/* Tabs — counts live here now, replacing the old six-card stat grid */}
       <div className="sticky top-14 z-20 border-y border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-none">
-            {TABS.map((t) => {
-              const Icon = t.icon;
-              const active = tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition",
-                    active
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                  )}
-                >
-                  <Icon className="h-4 w-4" /> {t.label}
-                </button>
-              );
-            })}
+        <div className="mx-auto w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2">
+            <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto scrollbar-none">
+              {TABS.map((t) => {
+                const Icon = t.icon;
+                const active = tab === t.id;
+                const count = tabCounts[t.id];
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition",
+                      active
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {t.label}
+                    {count !== null && (
+                      <span
+                        className={cn(
+                          "ml-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+                          active ? "bg-white/20 text-white" : "bg-white text-slate-500",
+                        )}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Money totals: wrap under the tabs on narrow screens rather than
+                forcing a horizontal scroll. */}
+            <dl className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-slate-500">Value</dt>
+                <dd className="font-bold tabular-nums text-slate-900">{formatINR(totalValue)}</dd>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-slate-500">Paid</dt>
+                <dd className="font-bold tabular-nums text-emerald-700">{formatINR(totalPaid)}</dd>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-slate-500">Remaining</dt>
+                <dd className="font-bold tabular-nums text-amber-700">{formatINR(totalRemaining)}</dd>
+              </div>
+            </dl>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {tab === "overview" && (
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="space-y-4 lg:col-span-2">
@@ -454,32 +450,14 @@ export default function UserDetailClient({
             </div>
 
             <div className="space-y-4">
+              {/* The "At a glance" counts card was removed — those numbers are
+                  now badges on the tab bar, and repeating them here was noise. */}
               <div className="card p-5">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  At a glance
-                </h3>
-                <div className="mt-4 space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Bookings</span>
-                    <span className="font-semibold">{bookings.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Payments</span>
-                    <span className="font-semibold">{allPayments.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Documents</span>
-                    <span className="font-semibold">{docUrls.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Tickets</span>
-                    <span className="font-semibold">{tickets.length}</span>
-                  </div>
-                </div>
-                <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
-                  Share this page — anyone with the link can view it. No login
-                  required. The URL contains the unique ID.
-                </div>
+                <h3 className="text-sm font-semibold text-slate-900">Access</h3>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  This profile is restricted to Admin and Director accounts. The
+                  link is not public — anyone else who opens it is redirected.
+                </p>
               </div>
 
               {docUrls[0] && (
@@ -747,50 +725,14 @@ export default function UserDetailClient({
 
       {!embedded && (
         <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
-          Aurum Real Estate Operations · Shareable profile — No login required
+          Aurum Real Estate Operations · Internal profile — Admin and Director access only
         </footer>
       )}
     </div>
   );
 }
 
-function Stat({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  icon: any;
-  tone?: string;
-}) {
-  const toneCls =
-    tone === "emerald"
-      ? "text-emerald-700"
-      : tone === "amber"
-        ? "text-amber-700"
-        : "text-slate-900";
-  return (
-    <div className="card p-4 min-w-0 overflow-hidden">
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-        <Icon className="h-3.5 w-3.5 shrink-0" /> {label}
-      </div>
-      <div
-        className={cn(
-          "mt-1 text-sm font-bold tabular-nums sm:text-base break-words leading-tight",
-          toneCls,
-        )}
-        title={value}
-      >
-        {value}
-      </div>
-      <div className="text-xs text-slate-400">{sub}</div>
-    </div>
-  );
-}
+
 function Info({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">

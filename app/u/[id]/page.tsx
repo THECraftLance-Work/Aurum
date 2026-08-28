@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireRole } from "@/lib/auth/session";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import UserDetailClient from "@/components/users/UserDetailClient";
 import type { DocUrl } from "@/components/users/UserDetailClient";
@@ -11,6 +12,17 @@ export default async function PublicUserDetail({
 }: {
   params: { id: string };
 }) {
+  // ACCESS CONTROL — this must stay above every query.
+  //
+  // The page reads with the service-role client, which bypasses RLS entirely,
+  // and `select("*")` on bookings includes bank_account_number, bank_ifsc and
+  // the customer's phone/email. Without this gate the whole profile is readable
+  // by anyone holding the UUID, with no login.
+  //
+  // requireRole redirects to /login when signed out and /dashboard for any
+  // other role, so SM/CP/Accountant cannot reach it either.
+  await requireRole(["ADMIN", "DIRECTOR"]);
+
   const admin = createSupabaseAdmin();
 
   const { data: u, error: userErr } = await admin

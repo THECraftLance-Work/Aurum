@@ -40,7 +40,9 @@ export default function Tooltip({
         id={id}
         role="tooltip"
         className={cn(
-          "pointer-events-none absolute left-1/2 z-50 w-max max-w-xs -translate-x-1/2 rounded-xl bg-slate-900 px-2.5 py-1.5 text-xs font-normal leading-snug text-white shadow-pop transition-all duration-150 ease-out-quint",
+          // text-left: the bubble is absolutely positioned but still inherits
+          // text-align from its cell, which right-aligns it in numeric columns.
+          "pointer-events-none absolute left-1/2 z-50 w-max max-w-xs -translate-x-1/2 rounded-xl bg-slate-900 px-2.5 py-1.5 text-left text-xs font-normal leading-snug text-white shadow-pop transition-all duration-150 ease-out-quint",
           "whitespace-normal break-words",
           side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5",
           open ? "opacity-100 translate-y-0" : "opacity-0 invisible",
