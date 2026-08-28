@@ -139,7 +139,7 @@ export function buildPaymentEmail(d: PaymentAlertData) {
 }
 
 export function buildBookingCreatedEmail(d: BookingAlertData) {
-  const href = `${appUrl()}/bookings/${d.bookingUuid}`;
+  const href = `${appUrl()}/b/${d.bookingUuid}`;
   const rows: [string, string][] = [
     ["Booking Reference", d.bookingRef],
     ["Customer Name", d.customerName],
