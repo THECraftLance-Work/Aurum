@@ -1,12 +1,19 @@
-import AurumLogo from "@/components/ui/AurumLogo";
-
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+import { WalletIcon, Building2, Briefcase } from "lucide-react";
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-screen w-full grid lg:grid-cols-[1.1fr_1fr] bg-[var(--color-bg)]">
       {/* Left side: Editorial Brand & Statistics */}
-      <div className="hidden lg:flex flex-col justify-between p-12 lg:p-16 bg-[#ec3013] text-white">
+      <div className="hidden lg:flex flex-col justify-between p-12 lg:p-12 bg-[#ec3013] text-white">
         <div>
-          <AurumLogo dark={true} />
+          <img
+            src="/APP_LOGO.png"
+            alt="Aurum Real Estate"
+            className="h-30 w-full object-cover"
+          />
         </div>
 
         <div className="max-w-lg space-y-6">
@@ -15,23 +22,41 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Bookings, payments and approvals in one ledger.
           </h1>
           <p className="text-base leading-relaxed text-white/90 font-normal">
-            Internal platform for sales, channel partners, accounts and leadership.
-            Every booking carries its payment trail, verification state and approver.
+            Internal platform for sales, channel partners, accounts and
+            leadership. Every booking carries its payment trail, verification
+            state and approver.
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-6 pt-8 border-t border-white/30">
+        <div className="grid grid-cols-3 gap-10 pt-8 border-t border-white/30">
           <div>
-            <div className="font-heading font-extrabold text-2xl xl:text-3xl">₹412 Cr</div>
-            <div className="text-[11px] font-medium tracking-wider uppercase opacity-85 mt-1">Booked FY26</div>
+            <div className=" flex flex-col font-heading font-extrabold text-2xl xl:text-3xl">
+              <div>
+                <WalletIcon />
+              </div>
+              ₹412 Cr
+            </div>
+            <div className="text-[11px] font-medium tracking-wider uppercase opacity-85 mt-1">
+              Booked FY26
+            </div>
           </div>
           <div>
-            <div className="font-heading font-extrabold text-2xl xl:text-3xl">1,284</div>
-            <div className="text-[11px] font-medium tracking-wider uppercase opacity-85 mt-1">Units sold</div>
+            <div className="font-heading font-extrabold text-2xl xl:text-3xl">
+              <Building2 />
+              1,284
+            </div>
+            <div className="text-[11px] font-medium tracking-wider uppercase opacity-85 mt-1">
+              Units sold
+            </div>
           </div>
           <div>
-            <div className="font-heading font-extrabold text-2xl xl:text-3xl">9</div>
-            <div className="text-[11px] font-medium tracking-wider uppercase opacity-85 mt-1">Live projects</div>
+            <Briefcase />
+            <div className="font-heading font-extrabold text-2xl xl:text-3xl">
+              9
+            </div>
+            <div className="text-[11px] font-medium tracking-wider uppercase opacity-85 mt-1">
+              Live projects
+            </div>
           </div>
         </div>
       </div>
@@ -40,8 +65,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex items-center justify-center p-6 sm:p-12 lg:p-16 bg-[var(--color-bg)] min-h-screen">
         <div className="w-full max-w-md">
           {/* Logo badge above form for high visibility */}
-          <div className="mb-6 flex justify-start">
-            <AurumLogo dark={false} />
+          <div className="mb-20  flex justify-center lg:hidden">
+            <img
+              src="/APP_LOGO.png"
+              alt="Aurum Real Estate"
+              className="h-50 w-full object-cover"
+            />
           </div>
 
           {children}
@@ -50,4 +79,3 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     </div>
   );
 }
-

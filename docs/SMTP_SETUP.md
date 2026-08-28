@@ -30,15 +30,6 @@ Gmail requires an **App Password** — your normal account password will not wor
 3. Create one named `Aurum Ops`. Copy the **16-character** password — Google shows it once.
 4. Set the secrets:
 
-```bash
-npx supabase secrets set \
-  SMTP_HOST=smtp.gmail.com \
-  SMTP_PORT=465 \
-  SMTP_SECURE=true \
-  SMTP_USER=you@yourdomain.com \
-  SMTP_PASSWORD=abcdefghijklmnop \
-  SMTP_FROM="Aurum Ops <you@yourdomain.com>"
-```
 
 Paste the App Password **without spaces**. Google displays it as `abcd efgh ijkl mnop`; the spaces are for readability only.
 
