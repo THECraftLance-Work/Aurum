@@ -4,6 +4,7 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendNotification, writeAudit } from "@/lib/utils/notifications";
 import { formatINR } from "@/lib/utils/format";
+import { dispatchOutbound } from "@/lib/integrations/outbound";
 
 const Body = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
@@ -45,7 +46,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const admin = createSupabaseAdmin();
   const { data: pay } = await admin
     .from("payments")
-    .select("id, amount, status, payment_mode, reference_no, submitted_by, booking_id, booking:booking_id(booking_id, total_property_value, total_amount_paid)")
+    .select("id, amount, status, payment_mode, reference_no, payment_date, submitted_by, booking_id, booking:booking_id(id, booking_id, total_property_value, total_amount_paid, customer:customer_id(name, email))")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -114,6 +115,37 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     oldData: { status: pay.status },
     newData: { status: decision, amount: pay.amount },
     reason: reason ?? undefined
+  });
+
+  // Email the customer. They have no account, so this is their only channel —
+  // and until now they heard nothing after the booking-created email, so a
+  // verified or rejected payment was invisible to them.
+  const cust: any = booking?.customer
+    ? (Array.isArray(booking.customer) ? booking.customer[0] : booking.customer)
+    : null;
+
+  const approvedTotal = Number(booking?.total_amount_paid ?? 0) + (decision === "APPROVED" ? Number(pay.amount) : 0);
+
+  await dispatchOutbound({
+    key: "PAYMENT_REVIEWED",
+    entityId: pay.id,
+    data: {
+      bookingRef: booking?.booking_id ?? "",
+      bookingUuid: booking?.id ?? pay.booking_id,
+      submitterName: profile.name,
+      customerName: cust?.name ?? "—",
+      customerEmail: cust?.email ?? null,
+      amount: Number(pay.amount),
+      mode: pay.payment_mode,
+      reference: pay.reference_no ?? null,
+      paymentDate: pay.payment_date ?? null,
+      decision,
+      reviewerName: profile.name,
+      rejectionReason: reason,
+      totalPaid: approvedTotal,
+      totalValue: Number(booking?.total_property_value ?? 0),
+      remainingBalance: Math.max(0, Number(booking?.total_property_value ?? 0) - approvedTotal)
+    }
   });
 
   return NextResponse.json({ ok: true, status: decision });

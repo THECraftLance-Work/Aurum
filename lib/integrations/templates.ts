@@ -191,3 +191,110 @@ export function buildWelcomeEmail(userName: string, userEmail: string, userRole:
     ].join("\n")
   };
 }
+
+// ---------------------------------------------------------------------------
+// Customer-facing payment emails
+//
+// The customer has no account, so email is their only channel. Every one links
+// to /b/<booking-uuid> — the page where they can see the full record, the
+// payment history and the documents. Previously they only ever received the
+// booking-created email, so after that first message they had no way back in
+// and no visibility of payment progress.
+// ---------------------------------------------------------------------------
+
+/** Sent the moment a payment is recorded, before verification. */
+export function buildPaymentReceivedCustomerEmail(d: PaymentAlertData) {
+  const href = `${appUrl()}/b/${d.bookingUuid}`;
+  const rows: [string, string][] = [
+    ["Booking Reference", d.bookingRef],
+    ["Amount Recorded", formatINRRich(d.amount)],
+    ["Payment Mode", d.mode.replaceAll("_", " ")],
+    ...(d.reference ? [["Reference / UTR", d.reference] as [string, string]] : []),
+    ...(d.paymentDate ? [["Payment Date", d.paymentDate] as [string, string]] : []),
+    ["Recorded by", d.submitterName],
+    ["Status", "Pending verification"]
+  ];
+  return {
+    subject: `Payment recorded for ${d.bookingRef} — ${formatINRRich(d.amount)}`,
+    html: shell("We've recorded your payment", rows, href, "View booking & receipts"),
+    text: [
+      `Dear ${d.customerName},`,
+      ``,
+      `We have recorded a payment of ${formatINRRich(d.amount)} against booking ${d.bookingRef}.`,
+      ``,
+      ...rows.map(([k, v]) => `${k}: ${v}`),
+      ``,
+      `This payment is now with our accounts team for verification. We will email`,
+      `you again as soon as it is confirmed. It is not yet reflected in your paid`,
+      `total until then.`,
+      ``,
+      `View your booking: ${href}`,
+      ``,
+      `Thank you for choosing Aurum Real Estate.`
+    ].join("\n")
+  };
+}
+
+/** Sent when an accountant approves or rejects a payment. */
+export function buildPaymentReviewedCustomerEmail(d: PaymentAlertData) {
+  const href = `${appUrl()}/b/${d.bookingUuid}`;
+  const approved = d.decision === "APPROVED";
+
+  const rows: [string, string][] = approved
+    ? [
+        ["Booking Reference", d.bookingRef],
+        ["Amount Verified", formatINRRich(d.amount)],
+        ["Payment Mode", d.mode.replaceAll("_", " ")],
+        ...(d.reference ? [["Reference / UTR", d.reference] as [string, string]] : []),
+        ...(d.totalPaid !== undefined ? [["Total Paid to Date", formatINRRich(d.totalPaid)] as [string, string]] : []),
+        ["Remaining Balance", formatINRRich(d.remainingBalance)],
+        ["Status", "Verified"]
+      ]
+    : [
+        ["Booking Reference", d.bookingRef],
+        ["Amount", formatINRRich(d.amount)],
+        ["Payment Mode", d.mode.replaceAll("_", " ")],
+        ...(d.reference ? [["Reference / UTR", d.reference] as [string, string]] : []),
+        ["Status", "Could not be verified"],
+        ...(d.rejectionReason ? [["Reason", d.rejectionReason] as [string, string]] : [])
+      ];
+
+  return {
+    subject: approved
+      ? `Payment verified for ${d.bookingRef} — ${formatINRRich(d.amount)}`
+      : `Action needed on your payment for ${d.bookingRef}`,
+    html: shell(
+      approved ? "Your payment has been verified" : "We couldn't verify this payment",
+      rows,
+      href,
+      "View booking & receipts"
+    ),
+    text: approved
+      ? [
+          `Dear ${d.customerName},`,
+          ``,
+          `Your payment of ${formatINRRich(d.amount)} against booking ${d.bookingRef} has`,
+          `been verified by our accounts team and credited to your booking.`,
+          ``,
+          ...rows.map(([k, v]) => `${k}: ${v}`),
+          ``,
+          `View your booking: ${href}`,
+          ``,
+          `Thank you for choosing Aurum Real Estate.`
+        ].join("\n")
+      : [
+          `Dear ${d.customerName},`,
+          ``,
+          `We were unable to verify your payment of ${formatINRRich(d.amount)} against`,
+          `booking ${d.bookingRef}.`,
+          ``,
+          ...rows.map(([k, v]) => `${k}: ${v}`),
+          ``,
+          `This amount has NOT been credited to your booking. Please contact your`,
+          `sales representative so we can resolve it — no action is needed on this`,
+          `email itself.`,
+          ``,
+          `View your booking: ${href}`
+        ].join("\n")
+  };
+}

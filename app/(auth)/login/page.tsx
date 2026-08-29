@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import LoginForm from "./LoginForm";
 
 export default function LoginPage() {
@@ -17,7 +18,7 @@ export default function LoginPage() {
           className="py-3 px-4 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors border-l border-[var(--color-divider)] text-left flex items-center justify-between"
         >
           <span>Request access</span>
-          <span className="text-[10px] opacity-60">→</span>
+          <ArrowRight className="h-3.5 w-3.5 opacity-60" />
         </Link>
       </div>
 

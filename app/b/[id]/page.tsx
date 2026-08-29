@@ -77,7 +77,7 @@ export default async function PublicBookingPage({ params }: { params: { id: stri
                   <Info label="Bank" value={b.bank_name ?? "—"} />
                   <Info label="Branch" value={b.bank_branch ?? "—"} />
                   <Info label="Account holder" value={b.bank_account_holder ?? "—"} />
-                  <Info label="Account number" value={b.bank_account_number ?? "—"} />
+                  <Info label="Account number" value={maskAccount(b.bank_account_number)} />
                   <Info label="IFSC" value={b.bank_ifsc ?? "—"} />
                   <Info label="Home loan" value={b.loan_sanctioned ? `Sanctioned${b.loan_amount ? " · " + formatINR(b.loan_amount) : ""}` : "Not sanctioned"} />
                 </div>
@@ -187,4 +187,19 @@ function Info({ label, value, span }: { label: string; value: React.ReactNode; s
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "emerald" | "amber" }) {
   const c = tone === "emerald" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : "text-slate-900";
   return <div className="rounded-xl border border-slate-200 p-4"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-semibold tabular-nums ${c}`}>{value}</div></div>;
+}
+
+/**
+ * Mask all but the last four digits.
+ *
+ * This page is reachable by anyone holding the URL — it is the link we email to
+ * customers, who have no account to log into. Showing a full bank account
+ * number to whoever the link is forwarded to is needless exposure; the last
+ * four are enough for the customer to recognise their own account.
+ */
+function maskAccount(v: string | null | undefined) {
+  if (!v) return "—";
+  const digits = v.replace(/\s+/g, "");
+  if (digits.length <= 4) return digits;
+  return "•".repeat(Math.max(4, digits.length - 4)) + digits.slice(-4);
 }

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
+import { ArrowRight } from "lucide-react";
 
 const ROLES = [
   { value: "SM", label: "Sales Manager" },
@@ -102,8 +103,8 @@ export default function RegisterForm() {
 
       {error && <div className="border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</div>}
 
-      <button className="w-full py-3 px-4 bg-[#ec3013] hover:bg-[#dd2b0f] text-white font-semibold text-sm transition-colors shadow-sm disabled:opacity-50 cursor-pointer" disabled={busy}>
-        {busy ? "Submitting request..." : "Submit for Director approval →"}
+      <button className="flex w-full items-center justify-center gap-2 bg-[#ec3013] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#dd2b0f] disabled:opacity-50 cursor-pointer" disabled={busy}>
+        {busy ? "Submitting request..." : <>Submit for Director approval <ArrowRight className="h-4 w-4" /></>}
       </button>
     </form>
   );

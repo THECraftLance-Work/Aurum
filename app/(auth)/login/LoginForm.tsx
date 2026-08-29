@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
+import { ArrowRight } from "lucide-react";
 import PremiumLoader from "@/components/ui/PremiumLoader";
 
 export default function LoginForm() {
@@ -111,9 +112,9 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={busy}
-        className="w-full py-3 px-4 bg-[#ec3013] hover:bg-[#dd2b0f] text-white font-semibold text-sm transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+        className="flex w-full items-center justify-center gap-2 bg-[#ec3013] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#dd2b0f] disabled:opacity-50 cursor-pointer"
       >
-        {busy ? "Signing in..." : "Enter platform →"}
+        {busy ? "Signing in..." : <>Enter platform <ArrowRight className="h-4 w-4" /></>}
       </button>
     </form>
     </>

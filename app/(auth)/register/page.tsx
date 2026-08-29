@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import RegisterForm from "./RegisterForm";
 
 export default function RegisterPage() {
@@ -10,7 +11,7 @@ export default function RegisterPage() {
           href="/login"
           className="py-3 px-4 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors text-left flex items-center justify-between"
         >
-          <span>← Sign in</span>
+          <span className="inline-flex items-center gap-1.5"><ArrowLeft className="h-3.5 w-3.5" /> Sign in</span>
         </Link>
         <button
           type="button"

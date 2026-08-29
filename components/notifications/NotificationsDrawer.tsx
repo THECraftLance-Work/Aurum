@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { X, CheckCheck, Inbox, Trash2 } from "lucide-react";
+import { X, CheckCheck, Inbox, Trash2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import type { SessionUser } from "@/lib/auth/session";
@@ -170,7 +170,7 @@ export default function NotificationsDrawer({
                     <div className="mt-1.5 flex items-center gap-2">
                       <span className="badge bg-slate-100 text-slate-600">{n.category}</span>
                       {href && (
-                        <Link href={href} className="text-xs font-medium text-accent hover:underline">Open →</Link>
+                        <Link href={href} className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">Open <ArrowRight className="h-3 w-3" /></Link>
                       )}
                     </div>
                   </button>

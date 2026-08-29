@@ -7,8 +7,9 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import EmptyState from "@/components/ui/EmptyState";
 import Tooltip from "@/components/ui/Tooltip";
 import { formatDate, formatINR, roleLabels } from "@/lib/utils/format";
+import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import {
-  ClipboardList, Wallet, TrendingUp, ShieldCheck, CheckCircle2, XCircle, Users, Clock, Plus
+  ClipboardList, Wallet, TrendingUp, ShieldCheck, CheckCircle2, XCircle, Users, Clock, Plus, ArrowRight
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +28,8 @@ export default async function DashboardPage() {
       ? supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at").eq("created_by", user.id).order("created_at", { ascending: false }).limit(6)
       : supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at").order("created_at", { ascending: false }).limit(6),
     own
-      ? supabase.from("payments").select("id, amount, payment_date, payment_mode, status").eq("submitted_by", user.id).order("created_at", { ascending: false }).limit(6)
-      : supabase.from("payments").select("id, amount, payment_date, payment_mode, status").order("created_at", { ascending: false }).limit(6),
+      ? supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id)").eq("submitted_by", user.id).order("created_at", { ascending: false }).limit(6)
+      : supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id)").order("created_at", { ascending: false }).limit(6),
     user.role === "DIRECTOR"
       ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("status", "PENDING_APPROVAL")
       : Promise.resolve({ count: 0 } as any)
@@ -58,10 +59,13 @@ export default async function DashboardPage() {
   const recentPayments = paymentsRes.data ?? [];
   const pendingUsers = pendingUsersRes.count ?? 0;
 
+  // Names for "recorded by" — RLS hides other users from non-admin sessions.
+  const dir = await resolveDirectory(recentPayments.map((p: any) => p.submitted_by));
+
   return (
     <>
       <PageHeader
-        title={`Hello ${user.name.split(" ")[0]} 👋`}
+        title={`Hello ${user.name.split(" ")[0]}`}
         description={`${roleLabels[user.role]} · here's what's happening today.`}
         actions={
           ["SM", "CP", "ADMIN", "DIRECTOR"].includes(user.role) && (
@@ -94,7 +98,7 @@ export default async function DashboardPage() {
         <div className="card min-w-0 overflow-hidden p-0 lg:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Recent bookings</h3>
-            <Link href="/bookings" className="text-xs font-medium text-slate-500 transition-colors hover:text-accent">View all →</Link>
+            <Link href="/bookings" className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-accent">View all <ArrowRight className="h-3 w-3" /></Link>
           </div>
           {bookings.length === 0 ? (
             <EmptyState title="No bookings yet" description="Create a new booking to see it here." />
@@ -146,19 +150,27 @@ export default async function DashboardPage() {
         <div className="card min-w-0 overflow-hidden p-0">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Payment activity</h3>
-            <Link href="/payments" className="text-xs font-medium text-slate-500 transition-colors hover:text-accent">View all →</Link>
+            <Link href="/payments" className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-accent">View all <ArrowRight className="h-3 w-3" /></Link>
           </div>
           {recentPayments.length === 0 ? (
             <EmptyState title="No payments" description="Payments will appear here." />
           ) : (
             <ul className="divide-y divide-border">
               {recentPayments.map((p: any) => (
-                <li key={p.id} className="px-5 py-3.5 transition-colors hover:bg-slate-50">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium tabular-nums text-slate-900">{formatINR(p.amount)}</div>
-                    <StatusBadge status={p.status} />
-                  </div>
-                  <div className="truncate text-xs text-slate-500">{formatDate(p.payment_date)} · {p.payment_mode.replaceAll("_", " ")}</div>
+                <li key={p.id}>
+                  <Link href={`/payments/${p.id}`} className="block px-5 py-3.5 transition-colors hover:bg-slate-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-medium tabular-nums text-slate-900">{formatINR(p.amount)}</div>
+                      <StatusBadge status={p.status} />
+                    </div>
+                    <div className="truncate text-xs text-slate-500">
+                      {(Array.isArray(p.booking) ? p.booking[0] : p.booking)?.booking_id ?? "—"}
+                      {" · "}{formatDate(p.payment_date)} · {p.payment_mode.replaceAll("_", " ")}
+                    </div>
+                    <div className="truncate text-xs text-slate-400">
+                      Recorded by {displayUser(dir, p.submitted_by, { withRole: true })}
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

@@ -4,7 +4,8 @@ import { whatsappEnv } from "./env";
 import { isEmail } from "./phone";
 import {
   bookingWhatsAppParams, paymentWhatsAppParams, bookingDeepLinkParam,
-  buildBookingEmail, buildPaymentEmail, buildBookingCreatedEmail
+  buildBookingEmail, buildPaymentEmail, buildBookingCreatedEmail,
+  buildPaymentReceivedCustomerEmail, buildPaymentReviewedCustomerEmail
 } from "./templates";
 import type { OutboundEvent } from "./types";
 
@@ -69,17 +70,44 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
     }
   } else {
     const d = event.data;
-    const mail = buildPaymentEmail(d);
-    for (const to of rec.email) {
+
+    // Internal ops copy. Only for a newly recorded payment — a verification
+    // decision is not something the ops list needs a second email about.
+    if (event.key === "PAYMENT_ADDED") {
+      const mail = buildPaymentEmail(d);
+      for (const to of rec.email) {
+        rows.push({
+          event_key: event.key, channel: "EMAIL", recipient: to,
+          entity_type: "payment", entity_id: event.entityId,
+          subject: mail.subject,
+          payload: { html: mail.html, text: mail.text },
+          dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
+        });
+      }
+    }
+
+    // Customer copy — sent on BOTH events, because email is the customer's
+    // only channel and they previously heard nothing after booking creation.
+    if (d.customerEmail && isEmail(d.customerEmail)) {
+      const mail = event.key === "PAYMENT_REVIEWED"
+        ? buildPaymentReviewedCustomerEmail(d)
+        : buildPaymentReceivedCustomerEmail(d);
+      // The decision is part of the key so approve-after-reject still sends.
+      const suffix = event.key === "PAYMENT_REVIEWED" ? `:${d.decision}` : "";
       rows.push({
-        event_key: event.key, channel: "EMAIL", recipient: to,
-        entity_type: "payment", entity_id: event.entityId,
+        event_key: `${event.key}_CUSTOMER`,
+        channel: "EMAIL",
+        recipient: d.customerEmail,
+        entity_type: "payment",
+        entity_id: event.entityId,
         subject: mail.subject,
         payload: { html: mail.html, text: mail.text },
-        dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
+        dedupe_key: `${event.key}_CUSTOMER:${event.entityId}${suffix}:EMAIL:${d.customerEmail}`
       });
     }
-    for (const to of rec.whatsapp) {
+
+    // WhatsApp goes to the internal ops list only, and only for new payments.
+    for (const to of event.key === "PAYMENT_ADDED" ? rec.whatsapp : []) {
       rows.push({
         event_key: event.key, channel: "WHATSAPP", recipient: to,
         entity_type: "payment", entity_id: event.entityId,

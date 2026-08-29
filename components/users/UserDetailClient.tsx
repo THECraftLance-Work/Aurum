@@ -18,6 +18,7 @@ import {
   FileText,
   Ticket,
   Paperclip,
+  Image as ImageIcon,
   Copy,
   Check,
   Share2,
@@ -30,6 +31,7 @@ import {
   ExternalLink,
   ChevronDown,
   ArrowLeft,
+  ArrowRight,
   Sparkles,
 } from "lucide-react";
 
@@ -117,10 +119,14 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-function fileIcon(mime: string) {
-  if (mime.includes("pdf")) return "📄";
-  if (mime.includes("image")) return "🖼️";
-  return "📎";
+/** Lucide component for a mime type — replaces the emoji glyphs. */
+function FileIcon({ mime, className }: { mime: string; className?: string }) {
+  const Icon = mime.includes("pdf")
+    ? FileText
+    : mime.includes("image")
+      ? ImageIcon
+      : Paperclip;
+  return <Icon className={className ?? "h-4 w-4"} aria-hidden="true" />;
 }
 function fileSize(n: number) {
   if (n < 1024) return `${n} B`;
@@ -433,7 +439,7 @@ export default function UserDetailClient({
                       onClick={() => setTab("bookings")}
                       className="text-xs font-semibold text-[#ec3013] hover:underline"
                     >
-                      View all →
+                      View all <ArrowRight className="h-3 w-3" />
                     </button>
                   </div>
                   <BookingCard
@@ -474,7 +480,7 @@ export default function UserDetailClient({
                         className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5"
                       >
                         <span className="min-w-0 text-sm">
-                          <span className="mr-1">{fileIcon(d.mime_type)}</span>
+                          <FileIcon mime={d.mime_type} className="mr-1.5 inline h-3.5 w-3.5 shrink-0 align-[-2px] text-slate-400" />
                           <span className="truncate font-medium">
                             {d.file_name}
                           </span>
@@ -496,7 +502,7 @@ export default function UserDetailClient({
                     onClick={() => setTab("documents")}
                     className="mt-3 text-xs font-semibold text-slate-600 hover:text-slate-900"
                   >
-                    View all documents →
+                    View all documents <ArrowRight className="h-3 w-3" />
                   </button>
                 </div>
               )}
@@ -692,7 +698,7 @@ export default function UserDetailClient({
               {docUrls.map((d) => (
                 <div key={d.id} className="card flex flex-col p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-lg">{fileIcon(d.mime_type)}</span>
+                    <FileIcon mime={d.mime_type} className="h-5 w-5 shrink-0 text-slate-500" />
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                       {d.mime_type.split("/")[1] ?? d.mime_type}
                     </span>
@@ -969,7 +975,7 @@ function BookingCard({
                     className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
                   >
                     <span className="min-w-0 truncate text-sm">
-                      <span className="mr-1">{fileIcon(d.mime_type)}</span>
+                      <FileIcon mime={d.mime_type} className="mr-1.5 inline h-3.5 w-3.5 shrink-0 align-[-2px] text-slate-400" />
                       {d.file_name}
                     </span>
                     <button

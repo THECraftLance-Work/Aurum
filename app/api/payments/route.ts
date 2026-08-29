@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const admin = createSupabaseAdmin();
   const { data: bk } = await admin
     .from("bookings")
-    .select("id, booking_id, remaining_balance, customer:customer_id(name)")
+    .select("id, booking_id, remaining_balance, total_amount_paid, total_property_value, customer:customer_id(name, email)")
     .eq("id", booking_id)
     .maybeSingle();
   if (!bk) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -91,8 +91,11 @@ export async function POST(req: Request) {
       bookingUuid: bk.id,
       submitterName: profile.name,
       customerName: (bk as any).customer?.name ?? "—",
+      customerEmail: (bk as any).customer?.email ?? null,
       amount: Number(amount),
       mode: payment_mode,
+      reference: reference_no ?? null,
+      paymentDate: payment_date,
       // Payment lands as PENDING, so the booking's balance is unchanged until
       // an accountant approves it.
       remainingBalance: Number(bk.remaining_balance)

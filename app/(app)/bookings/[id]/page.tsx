@@ -10,6 +10,7 @@ import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
 import AttachmentList from "@/components/bookings/AttachmentList";
 import PaymentReviewActions from "@/components/payments/PaymentReviewActions";
+import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -185,8 +186,8 @@ export default async function BookingDetail({ params }: { params: { id: string }
                                 size="compact"
                               />
                             ) : (
-                              <Link href={`/payments/${p.id}`} className="text-xs font-medium text-slate-500 hover:text-accent">
-                                Details →
+                              <Link href={`/payments/${p.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-accent">
+                                Details <ArrowRight className="h-3 w-3" />
                               </Link>
                             )}
                           </td>

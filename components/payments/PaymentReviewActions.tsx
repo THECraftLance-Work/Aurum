@@ -9,7 +9,7 @@ export default function PaymentReviewActions({
   paymentId,
   amount,
   bookingRef,
-  size = "default"
+  size = "default",
 }: {
   paymentId: string;
   amount: number;
@@ -30,17 +30,25 @@ export default function PaymentReviewActions({
       const res = await fetch(`/api/payments/${paymentId}/review`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ decision, reason: decision === "REJECTED" ? reason.trim() : null })
+        body: JSON.stringify({
+          decision,
+          reason: decision === "REJECTED" ? reason.trim() : null,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast({ tone: "error", title: "Could not record decision", description: json.error });
+        toast({
+          tone: "error",
+          title: "Could not record decision",
+          description: json.error,
+        });
         return;
       }
       toast({
         tone: decision === "APPROVED" ? "success" : "warning",
-        title: decision === "APPROVED" ? "Payment approved" : "Payment rejected",
-        description: `${formatINR(amount)} on ${bookingRef}`
+        title:
+          decision === "APPROVED" ? "Payment approved" : "Payment rejected",
+        description: `${formatINR(amount)} on ${bookingRef}`,
       });
       setMode("idle");
       setReason("");
@@ -53,7 +61,9 @@ export default function PaymentReviewActions({
   if (mode === "rejecting") {
     return (
       <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3">
-        <label className="label text-rose-800">Why is this being rejected?</label>
+        <label className="label text-rose-800">
+          Why is this being rejected?
+        </label>
         <textarea
           className="input min-h-[80px]"
           value={reason}
@@ -62,10 +72,21 @@ export default function PaymentReviewActions({
           autoFocus
         />
         <div className="mt-2 flex gap-2">
-          <button onClick={() => { setMode("idle"); setReason(""); }} disabled={busy} className="btn-secondary h-9 flex-1">
+          <button
+            onClick={() => {
+              setMode("idle");
+              setReason("");
+            }}
+            disabled={busy}
+            className="btn-secondary h-9 flex-1"
+          >
             Cancel
           </button>
-          <button onClick={() => submit("REJECTED")} disabled={busy || reason.trim().length < 3} className="btn-danger h-9 flex-1">
+          <button
+            onClick={() => submit("REJECTED")}
+            disabled={busy || reason.trim().length < 3}
+            className="btn-danger h-9 flex-1"
+          >
             {busy ? "Rejecting…" : "Confirm reject"}
           </button>
         </div>
@@ -77,10 +98,18 @@ export default function PaymentReviewActions({
 
   return (
     <div className="flex gap-2">
-      <button onClick={() => submit("APPROVED")} disabled={busy} className={`btn-success flex-1 ${h}`}>
+      <button
+        onClick={() => submit("APPROVED")}
+        disabled={busy}
+        className={`btn-success flex-1 ${h}`}
+      >
         <Check className="h-3.5 w-3.5" /> Approve
       </button>
-      <button onClick={() => setMode("rejecting")} disabled={busy} className={`btn-danger flex-1 ${h}`}>
+      <button
+        onClick={() => setMode("rejecting")}
+        disabled={busy}
+        className={`btn-danger flex-1 ${h}`}
+      >
         <X className="h-3.5 w-3.5" /> Reject
       </button>
     </div>
