@@ -241,7 +241,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
           {canAddPayment && (
             <div className="card p-5">
               <h3 className="text-sm font-semibold text-slate-900 mb-3">Add payment</h3>
-              <AddPaymentForm bookingId={b.id} maxAmount={b.remaining_balance} />
+              <AddPaymentForm bookingId={b.id} maxAmount={b.remaining_balance} totalPaid={b.total_amount_paid} />
             </div>
           )}
         </aside>

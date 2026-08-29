@@ -1,4 +1,5 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { kickDeliveryWorker } from "./kick";
 import { resolveRecipients } from "./recipients";
 import { whatsappEnv } from "./env";
 import { isEmail } from "./phone";
@@ -145,7 +146,15 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
     console.error("[outbound] enqueue failed", error.message);
     return { ids: [] };
   }
-  return { ids: (data ?? []).map((r: { id: string }) => r.id) };
+
+  const ids = (data ?? []).map((r: { id: string }) => r.id);
+
+  // Hand off to the worker immediately rather than waiting on the DB webhook /
+  // pg_cron, which silently do nothing if migration 0008 or the Vault secrets
+  // are missing. Fire-and-forget; cron still covers retries.
+  if (ids.length) kickDeliveryWorker();
+
+  return { ids };
 }
 
 /**
