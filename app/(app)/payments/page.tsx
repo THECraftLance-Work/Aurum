@@ -66,9 +66,8 @@ export default async function PaymentsPage({
       />
 
       <TabNav
-        tabs={TABS.map((t) => ({ key: t.key, label: t.label }))}
+        tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: href({ tab: t.key }) }))}
         active={tab.key}
-        hrefFor={(k) => href({ tab: k })}
       />
 
       <div className="card min-w-0 overflow-hidden p-0">

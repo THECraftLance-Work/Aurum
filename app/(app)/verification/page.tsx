@@ -67,8 +67,13 @@ export default async function VerificationPage({
   ]);
 
   const tabs = [
-    { key: "PAYMENTS", label: "Payments", badge: pendingCount },
-    ...BOOKING_TABS.map((t) => ({ key: t.key, label: t.label, badge: null as number | null }))
+    { key: "PAYMENTS", label: "Payments", href: "/verification?tab=PAYMENTS", badge: pendingCount },
+    ...BOOKING_TABS.map((t) => ({
+      key: t.key,
+      label: t.label,
+      href: `/verification?tab=${t.key}`,
+      badge: null as number | null
+    }))
   ];
 
   return (
@@ -78,11 +83,7 @@ export default async function VerificationPage({
         description="Bookings and payments are verified independently — a payment on an already-approved booking still needs sign-off."
       />
 
-      <TabNav
-        tabs={tabs}
-        active={activeKey}
-        hrefFor={(k) => `/verification?tab=${k}`}
-      />
+      <TabNav tabs={tabs} active={activeKey} />
 
       {activeKey === "PAYMENTS" ? (
         <div className="card min-w-0 overflow-hidden p-0">

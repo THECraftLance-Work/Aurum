@@ -3,26 +3,31 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 
-export type TabItem = { key: string; label: string; badge?: number | null };
+/**
+ * `href` is a precomputed string, NOT a builder function.
+ *
+ * Passing `hrefFor: (key) => string` from a Server Component threw
+ * "Functions cannot be passed directly to Client Components" at render time —
+ * props crossing that boundary must be serializable. The build doesn't catch
+ * it because these pages are force-dynamic and only execute on a real request.
+ */
+export type TabItem = { key: string; label: string; href: string; badge?: number | null };
 
 /**
  * Tab bar with an immediate pending state.
  *
- * These pages are `force-dynamic`, so switching tabs is a server round-trip.
- * As plain <Link>s a click did nothing visible until the new HTML arrived,
- * which reads as the app being slow. This marks the clicked tab active at once
- * and dims the outgoing content while the server responds — the work takes the
- * same time, it just stops feeling broken.
+ * These pages are force-dynamic, so switching tabs is a server round-trip. As
+ * plain <Link>s a click did nothing visible until the new HTML arrived, which
+ * reads as the app being slow. This marks the clicked tab active at once and
+ * dims the outgoing content while the server responds.
  */
 export default function TabNav({
   tabs,
   active,
-  hrefFor,
   className
 }: {
   tabs: TabItem[];
   active: string;
-  hrefFor: (key: string) => string;
   className?: string;
 }) {
   const router = useRouter();
@@ -51,7 +56,7 @@ export default function TabNav({
             onClick={() => {
               if (t.key === active) return;
               setOptimistic(t.key);
-              startTransition(() => router.push(hrefFor(t.key), { scroll: false }));
+              startTransition(() => router.push(t.href, { scroll: false }));
             }}
             aria-current={isActive ? "page" : undefined}
             className={cn(
