@@ -5,9 +5,11 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
+import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
 import AttachmentList from "@/components/bookings/AttachmentList";
+import PaymentReviewActions from "@/components/payments/PaymentReviewActions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,23 +19,29 @@ export default async function BookingDetail({ params }: { params: { id: string }
 
   const { data: b } = await supabase
     .from("bookings")
-    .select("*, customer:customer_id(*), creator:created_by(name, role, email)")
+    .select("id, booking_id, project_name, unit_number, property_details, total_property_value, total_amount_paid, remaining_balance, status, submitted_at, updated_at, rejection_reason, bank_name, bank_account_holder, bank_account_number, bank_ifsc, bank_branch, loan_sanctioned, loan_amount, created_by, customer:customer_id(name, phone, email)")
     .eq("id", params.id)
     .maybeSingle();
   if (!b) notFound();
+
+  // PostgREST types an embedded to-one relation as an array. (The old
+  // select("*") was untyped `any`, which is why this only surfaced once the
+  // columns were named explicitly.)
+  const customer: any = Array.isArray(b.customer) ? b.customer[0] ?? null : b.customer ?? null;
+
 
   // These two have no dependency on each other, so run them together rather
   // than paying two sequential round-trips.
   const [{ data: payments }, { data: history }, { data: attachments }] = await Promise.all([
     supabase
       .from("payments")
-      .select("*, submitter:submitted_by(name, role), reviewer:reviewed_by(name, role)")
+      .select("id, amount, payment_date, payment_mode, status, reference_no, submitted_by, reviewed_by")
       .eq("booking_id", b.id)
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
       .from("audit_logs")
-      .select("*, actor:actor_user_id(name)")
+      .select("id, action, reason, created_at, actor_user_id")
       .eq("entity_type", "booking")
       .eq("entity_id", b.id)
       .order("created_at", { ascending: false })
@@ -46,8 +54,16 @@ export default async function BookingDetail({ params }: { params: { id: string }
       .order("created_at", { ascending: false })
   ]);
 
+  // One batched lookup for every user id referenced on this page.
+  const dir = await resolveDirectory([
+    b.created_by,
+    ...(payments ?? []).flatMap((p: any) => [p.submitted_by, p.reviewed_by]),
+    ...(history ?? []).map((h: any) => h.actor_user_id)
+  ]);
+
   const canReview = ["ACCOUNTANT","ADMIN","DIRECTOR"].includes(user.role) && ["SUBMITTED","UNDER_REVIEW","UPDATED"].includes(b.status);
   const canAddPayment = ["SM","CP","ADMIN","DIRECTOR"].includes(user.role);
+  const canReviewPayments = ["ACCOUNTANT","ADMIN","DIRECTOR"].includes(user.role);
 
   return (
     <>
@@ -67,9 +83,9 @@ export default async function BookingDetail({ params }: { params: { id: string }
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Customer</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <Info label="Name"  value={b.customer?.name ?? "—"} />
-              <Info label="Phone" value={b.customer?.phone ?? "—"} />
-              <Info label="Email" value={b.customer?.email ?? "—"} />
+              <Info label="Name"  value={customer?.name ?? "—"} />
+              <Info label="Phone" value={customer?.phone ?? "—"} />
+              <Info label="Email" value={customer?.email ?? "—"} />
             </div>
           </div>
 
@@ -140,19 +156,43 @@ export default async function BookingDetail({ params }: { params: { id: string }
                       <th className="px-5 py-3 font-medium">Mode</th>
                       <th className="px-5 py-3 font-medium">Status</th>
                       <th className="px-5 py-3 font-medium">Submitted by</th>
+                      <th className="px-5 py-3 font-medium" />
                     </tr>
                   </thead>
                   <tbody>
-                    {payments!.map((p: any, i: number) => (
-                      <tr key={p.id} className="border-t border-border">
-                        <td className="px-5 py-3">#{payments!.length - i}</td>
-                        <td className="px-5 py-3 text-right tabular-nums font-medium">{formatINR(p.amount)}</td>
-                        <td className="px-5 py-3">{formatDate(p.payment_date)}</td>
-                        <td className="px-5 py-3">{p.payment_mode.replaceAll("_"," ")}</td>
-                        <td className="px-5 py-3"><StatusBadge status={p.status} /></td>
-                        <td className="px-5 py-3 text-slate-500">{p.submitter?.name ?? "—"}</td>
-                      </tr>
-                    ))}
+                    {payments!.map((p: any, i: number) => {
+                      const needsReview = ["PENDING", "UNDER_REVIEW"].includes(p.status);
+                      return (
+                        <tr key={p.id} className="border-t border-border">
+                          <td className="px-5 py-3">
+                            <Link href={`/payments/${p.id}`} className="font-medium text-slate-900 hover:text-accent">
+                              #{payments!.length - i}
+                            </Link>
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums font-medium">{formatINR(p.amount)}</td>
+                          <td className="px-5 py-3">{formatDate(p.payment_date)}</td>
+                          <td className="px-5 py-3">{p.payment_mode.replaceAll("_"," ")}</td>
+                          <td className="px-5 py-3"><StatusBadge status={p.status} /></td>
+                          <td className="px-5 py-3 text-slate-500">{displayUser(dir, p.submitted_by)}</td>
+                          <td className="px-5 py-3">
+                            {/* Each payment is verified on its own — booking approval
+                                no longer silently decides later payments. */}
+                            {needsReview && canReviewPayments ? (
+                              <PaymentReviewActions
+                                paymentId={p.id}
+                                amount={Number(p.amount)}
+                                bookingRef={b.booking_id}
+                                size="compact"
+                              />
+                            ) : (
+                              <Link href={`/payments/${p.id}`} className="text-xs font-medium text-slate-500 hover:text-accent">
+                                Details →
+                              </Link>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -169,7 +209,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
                   <li key={h.id} className="flex gap-3">
                     <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
                     <div className="text-sm">
-                      <div className="text-slate-900"><span className="font-medium">{h.actor?.name ?? "System"}</span> · {h.action.replaceAll("_"," ").toLowerCase()}</div>
+                      <div className="text-slate-900"><span className="font-medium">{h.actor_user_id ? displayUser(dir, h.actor_user_id) : "System"}</span> · {h.action.replaceAll("_"," ").toLowerCase()}</div>
                       <div className="text-xs text-slate-500">{formatDateTime(h.created_at)}{h.reason ? ` · ${h.reason}` : ""}</div>
                     </div>
                   </li>
@@ -183,7 +223,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900">Submission</h3>
             <dl className="mt-3 space-y-2 text-sm">
-              <Info label="Submitted by" value={`${b.creator?.name ?? "—"} (${b.creator?.role ?? ""})`} />
+              <Info label="Submitted by" value={displayUser(dir, b.created_by, { withRole: true })} />
               <Info label="Submitted at" value={formatDateTime(b.submitted_at)} />
               <Info label="Last updated" value={formatDateTime(b.updated_at)} />
               {b.rejection_reason && (

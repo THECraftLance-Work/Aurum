@@ -168,6 +168,19 @@ body {
   .cell-truncate {
     @apply block max-w-full truncate;
   }
+
+  /*
+    Whole-row navigation — see components/ui/ClickableRow.tsx.
+
+    The click is handled in JS rather than a stretched-link overlay: an overlay
+    needs `position: relative` on the <tr> to act as its containing block, which
+    is not reliable across engines. When it fails the overlay escapes to the
+    card and every click opens the wrong row. The primary cell stays a real
+    <a>, so middle-click and "open in new tab" still work.
+  */
+  .row-link {
+    @apply cursor-pointer;
+  }
 }
 
 /* ---------------------------------------------------------------------------

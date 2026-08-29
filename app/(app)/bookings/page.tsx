@@ -8,6 +8,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Tooltip from "@/components/ui/Tooltip";
 import { formatDate, formatINR } from "@/lib/utils/format";
 import BookingsFilters from "@/components/bookings/BookingsFilters";
+import ClickableRow from "@/components/ui/ClickableRow";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,10 @@ export default async function BookingsPage({
 
   let query = supabase
     .from("bookings")
-    .select("*, customer:customer_id(name, phone)", { count: "exact" })
+    .select(
+      "id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, remaining_balance, status, created_at, customer:customer_id(name, phone)",
+      { count: "exact" }
+    )
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
 
@@ -103,7 +107,7 @@ export default async function BookingsPage({
                 </thead>
                 <tbody>
                   {bookings.map((b: any) => (
-                    <tr key={b.id} className="row-hover border-t border-border">
+                    <ClickableRow key={b.id} href={`/bookings/${b.id}`} className="row-hover border-t border-border">
                       <td className="px-5 py-3">
                         <Link href={`/bookings/${b.id}`} className="cell-truncate font-medium text-slate-900 hover:text-accent">
                           {b.booking_id}
@@ -128,7 +132,7 @@ export default async function BookingsPage({
                       <td className="px-5 py-3 text-right tabular-nums text-amber-700">{formatINR(b.remaining_balance)}</td>
                       <td className="px-5 py-3"><StatusBadge status={b.status} /></td>
                       <td className="px-5 py-3 text-slate-500">{formatDate(b.created_at)}</td>
-                    </tr>
+                    </ClickableRow>
                   ))}
                 </tbody>
               </table>
