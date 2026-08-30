@@ -9,8 +9,8 @@ import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
 import AttachmentList from "@/components/bookings/AttachmentList";
-import PaymentReviewActions from "@/components/payments/PaymentReviewActions";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
+import ClickableRow from "@/components/ui/ClickableRow";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +64,6 @@ export default async function BookingDetail({ params }: { params: { id: string }
 
   const canReview = ["ACCOUNTANT","ADMIN","DIRECTOR"].includes(user.role) && ["SUBMITTED","UNDER_REVIEW","UPDATED"].includes(b.status);
   const canAddPayment = ["SM","CP","ADMIN","DIRECTOR"].includes(user.role);
-  const canReviewPayments = ["ACCOUNTANT","ADMIN","DIRECTOR"].includes(user.role);
 
   return (
     <>
@@ -79,7 +78,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Customer</h3>
@@ -148,52 +147,59 @@ export default async function BookingDetail({ params }: { params: { id: string }
               <div className="p-6 text-sm text-slate-500">No payments recorded.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                {/*
+                  table-fixed + colgroup: without explicit widths the review
+                  buttons pushed the table past the card and clipped the last
+                  column. Verification lives in the Verification Queue and on
+                  the payment page — this table is a read-only ledger.
+                */}
+                <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    <col className="w-[72px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[120px]" />
+                    <col />
+                    <col className="w-[44px]" />
+                  </colgroup>
                   <thead className="bg-slate-50 text-slate-500 text-left">
                     <tr>
-                      <th className="px-5 py-3 font-medium">Payment</th>
-                      <th className="px-5 py-3 font-medium text-right">Amount</th>
-                      <th className="px-5 py-3 font-medium">Date</th>
-                      <th className="px-5 py-3 font-medium">Mode</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
-                      <th className="px-5 py-3 font-medium">Submitted by</th>
-                      <th className="px-5 py-3 font-medium" />
+                      <th className="px-4 py-3 font-medium">#</th>
+                      <th className="px-4 py-3 font-medium text-right">Amount</th>
+                      <th className="px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium">Mode</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Submitted by</th>
+                      <th className="px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody>
-                    {payments!.map((p: any, i: number) => {
-                      const needsReview = ["PENDING", "UNDER_REVIEW"].includes(p.status);
-                      return (
-                        <tr key={p.id} className="border-t border-border">
-                          <td className="px-5 py-3">
-                            <Link href={`/payments/${p.id}`} className="font-medium text-slate-900 hover:text-accent">
-                              #{payments!.length - i}
-                            </Link>
-                          </td>
-                          <td className="px-5 py-3 text-right tabular-nums font-medium">{formatINR(p.amount)}</td>
-                          <td className="px-5 py-3">{formatDate(p.payment_date)}</td>
-                          <td className="px-5 py-3">{p.payment_mode.replaceAll("_"," ")}</td>
-                          <td className="px-5 py-3"><StatusBadge status={p.status} /></td>
-                          <td className="px-5 py-3 text-slate-500">{displayUser(dir, p.submitted_by)}</td>
-                          <td className="px-5 py-3">
-                            {/* Each payment is verified on its own — booking approval
-                                no longer silently decides later payments. */}
-                            {needsReview && canReviewPayments ? (
-                              <PaymentReviewActions
-                                paymentId={p.id}
-                                amount={Number(p.amount)}
-                                bookingRef={b.booking_id}
-                                size="compact"
-                              />
-                            ) : (
-                              <Link href={`/payments/${p.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-accent">
-                                Details <ArrowRight className="h-3 w-3" />
-                              </Link>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {payments!.map((p: any, i: number) => (
+                      <ClickableRow
+                        key={p.id}
+                        href={`/payments/${p.id}`}
+                        className="row-hover border-t border-border"
+                      >
+                        <td className="px-4 py-3">
+                          <Link href={`/payments/${p.id}`} className="font-medium text-slate-900 hover:text-accent">
+                            #{payments!.length - i}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">{formatINR(p.amount)}</td>
+                        <td className="px-4 py-3 text-slate-600">{formatDate(p.payment_date)}</td>
+                        <td className="px-4 py-3">
+                          <span className="cell-truncate text-slate-600">{p.payment_mode.replaceAll("_"," ")}</span>
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
+                        <td className="px-4 py-3">
+                          <span className="cell-truncate text-slate-600">{displayUser(dir, p.submitted_by)}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          <ChevronRight className="h-4 w-4" />
+                        </td>
+                      </ClickableRow>
+                    ))}
                   </tbody>
                 </table>
               </div>

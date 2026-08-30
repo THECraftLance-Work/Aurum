@@ -94,7 +94,10 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section className="mt-6 grid min-w-0 gap-4 lg:grid-cols-3">
+      {/* items-start: each card sizes to its own content. Without it the grid
+          stretches every item to the tallest in the row, so a long Payment
+          activity list left a large void under Recent bookings. */}
+      <section className="mt-6 grid min-w-0 items-start gap-4 lg:grid-cols-3">
         <div className="card min-w-0 overflow-hidden p-0 lg:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Recent bookings</h3>

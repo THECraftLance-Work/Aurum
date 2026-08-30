@@ -49,7 +49,7 @@ export default async function TicketDetail({ params }: { params: { id: string } 
         }
       />
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
           <div className="card">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Description</h3>

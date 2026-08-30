@@ -40,25 +40,73 @@ body {
   border-color: #e2e8f0;
 }
 
-/* Crisp scrollbars */
+/* ---------------------------------------------------------------------------
+   Scrollbars.
+
+   These were 7px with a near-white thumb, so on a light card they read as
+   "there is no scrollbar" — you could not tell a table scrolled sideways until
+   you tried. Wider track, higher-contrast thumb, and always-visible on the
+   horizontal scrollers that matter (data tables).
+   --------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;                      /* Firefox */
+  scrollbar-color: #94a3b8 transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f5f9;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #94a3b8;
+  border: 3px solid transparent;
+  background-clip: padding-box;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Reserve the gutter so content does not shift when a scrollbar appears. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/*
+  Horizontal scrollers inside cards: macOS hides overlay scrollbars until you
+  scroll, which makes a wide table look like it simply has clipped columns.
+  Forcing the classic bar keeps the affordance visible.
+*/
+.overflow-x-auto::-webkit-scrollbar {
+  height: 10px;
+  -webkit-appearance: none;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.overflow-x-auto:hover::-webkit-scrollbar-thumb {
   background: #94a3b8;
+  background-clip: padding-box;
 }
 
 @keyframes rmIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(236, 48, 19, 0.55); }
+  70%      { box-shadow: 0 0 0 6px rgba(236, 48, 19, 0); }
 }
 
 @keyframes shimmer {
@@ -69,6 +117,11 @@ body {
 
 .animate-rm-in {
   animation: rmIn 200ms ease-out both;
+}
+
+/* Draws the eye to a queue that needs action, without being a distraction. */
+.animate-badge-pulse {
+  animation: badgePulse 2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
 /* ---------------------------------------------------------------------------

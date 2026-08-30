@@ -7,6 +7,7 @@ import type { SessionUser } from "@/lib/auth/session";
 import GlobalSearch from "./GlobalSearch";
 import NotificationsDrawer from "@/components/notifications/NotificationsDrawer";
 import RaiseTicketModal from "@/components/tickets/RaiseTicketModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 export default function Header({ user, onMenu }: { user: SessionUser; onMenu: () => void }) {
   const router = useRouter();
@@ -14,6 +15,8 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
   const [unread, setUnread] = useState(0);
   const [drawer, setDrawer] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -34,6 +37,7 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
   }, [supabase, user.id]);
 
   async function signOut() {
+    setSigningOut(true);
     await supabase.auth.signOut();
     router.replace("/login");
   }
@@ -85,7 +89,7 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
               )}
             </button>
 
-            <button onClick={signOut} className="btn-secondary h-10 shadow-sm" title="Sign out">
+            <button onClick={() => setConfirmSignOut(true)} className="btn-secondary h-10 shadow-sm" title="Sign out">
               <LogOut className="h-4 w-4 text-slate-600" />
               <span className="hidden font-medium sm:inline">Sign out</span>
             </button>
@@ -95,6 +99,25 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
 
       <NotificationsDrawer user={user} open={drawer} onClose={() => setDrawer(false)} />
       <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+
+      {/* Signing out mid-task loses anything unsaved (a half-filled booking
+          form, a payment being reviewed), so it asks first. */}
+      <ConfirmDialog
+        open={confirmSignOut}
+        busy={signingOut}
+        tone="primary"
+        title="Sign out of Aurum?"
+        message={
+          <>
+            You are signed in as <span className="font-medium">{user.name}</span>.
+            Any unsaved work on this page will be lost.
+          </>
+        }
+        confirmLabel="Sign out"
+        cancelLabel="Stay signed in"
+        onConfirm={signOut}
+        onCancel={() => setConfirmSignOut(false)}
+      />
     </>
   );
 }

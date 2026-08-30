@@ -10,7 +10,7 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title="Profile & settings" description="Your account details and notification preferences." />
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="card p-5 lg:col-span-2">
           <h3 className="text-sm font-semibold text-slate-900 mb-4">Profile</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">

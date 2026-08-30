@@ -28,8 +28,14 @@ const NAV: Item[] = [
 ];
 
 export default function Sidebar({
-  user, mobileOpen, onMobileClose
-}: { user: SessionUser; mobileOpen: boolean; onMobileClose: () => void }) {
+  user, mobileOpen, onMobileClose, pendingVerification = 0
+}: {
+  user: SessionUser;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+  /** Payments awaiting verification — badged on the Verification Queue entry. */
+  pendingVerification?: number;
+}) {
   const pathname = usePathname();
   const accent = roleAccent[user.role];
   const items = NAV.filter((i) => i.roles.includes(user.role));
@@ -74,8 +80,22 @@ export default function Sidebar({
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Icon className={cn("h-4 w-4", active ? "text-white" : "text-slate-500 group-hover:text-slate-700")} />
-              {it.label}
+              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-slate-500 group-hover:text-slate-700")} />
+              <span className="min-w-0 flex-1 truncate">{it.label}</span>
+
+              {/* Work waiting on this user: a pulsing count, so a queue that
+                  needs action is visible from any page. */}
+              {it.href === "/verification" && pendingVerification > 0 && (
+                <span
+                  aria-label={`${pendingVerification} awaiting verification`}
+                  className={cn(
+                    "animate-badge-pulse inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+                    active ? "bg-white text-slate-900" : "bg-[#ec3013] text-white"
+                  )}
+                >
+                  {pendingVerification > 99 ? "99+" : pendingVerification}
+                </span>
+              )}
             </Link>
           );
         })}

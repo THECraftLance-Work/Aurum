@@ -109,7 +109,7 @@ export default async function PaymentDetail({ params }: { params: { id: string }
         }
       />
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
           {/* Status header — the amount is the hero, as in a payments app */}
           <div className={cn("card border", tone.bg, tone.ring)}>
