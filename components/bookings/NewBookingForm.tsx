@@ -11,7 +11,7 @@ export default function NewBookingForm({ role }: { role: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doc, setDoc] = useState<UploadedFile | null>(null);
-  const emptyCustomer = { title: "", name: "", father_spouse_name: "", date_of_birth: "", address: "", city: "", state: "", country: "India", pin_code: "", phone: "", alternate_phone: "", email: "", alternate_email: "", pan_number: "", aadhaar_number: "", occupation: "", organization: "", designation: "" };
+  const emptyCustomer = { title: "", name: "", relation_type: "", father_spouse_name: "", date_of_birth: "", address: "", city: "", state: "", country: "India", pin_code: "", phone: "", alternate_phone: "", email: "", alternate_email: "", pan_number: "", aadhaar_number: "", occupation: "", organization: "", designation: "" };
   const [customers, setCustomers] = useState([emptyCustomer]);
   const [form, setForm] = useState({
     project_name: "",
@@ -53,9 +53,10 @@ export default function NewBookingForm({ role }: { role: string }) {
     && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bank_ifsc.trim());
 
   const valid = useMemo(() => {
-    return Boolean(customers[0]?.name.trim() && form.project_name && form.unit_number)
+    const relationComplete = customers.every((customer) => !customer.relation_type || customer.father_spouse_name.trim());
+    return Boolean(customers[0]?.name.trim() && form.project_name && form.unit_number && relationComplete)
       && total > 0 && totalPaid <= total && !ifscInvalid;
-  }, [form, total, totalPaid, ifscInvalid]);
+  }, [customers, form, total, totalPaid, ifscInvalid]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,7 +65,17 @@ export default function NewBookingForm({ role }: { role: string }) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        customers: customers.map((c) => ({ ...c, name: c.name.trim(), phone: c.phone.trim() || null, email: c.email.trim() || null })),
+        customers: customers.map((c) => ({
+          ...c,
+          name: c.name.trim(),
+          // Keep the selected relationship with the existing database field.
+          father_spouse_name: c.father_spouse_name.trim()
+            ? `${c.relation_type}: ${c.father_spouse_name.trim()}`
+            : null,
+          relation_type: undefined,
+          phone: c.phone.trim() || null,
+          email: c.email.trim() || null,
+        })),
         booking: {
           project_name: form.project_name.trim(),
           unit_number: form.unit_number.trim(),
@@ -107,8 +118,8 @@ export default function NewBookingForm({ role }: { role: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1 grid gap-4 lg:grid-cols-3">
-      <div className="lg:col-span-2 space-y-4">
+    <form onSubmit={submit} className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1 grid gap-4 xl:grid-cols-3">
+      <div className="xl:col-span-2 space-y-4">
         <Section title="Customer details">
           <div className="space-y-4">
             {customers.map((customer, index) => (
@@ -117,7 +128,8 @@ export default function NewBookingForm({ role }: { role: string }) {
                 <Grid>
                   <Field label="Title" v={customer.title} onChange={(v) => updCustomer(index, "title", v)} />
                   <Field label="Full name *" v={customer.name} onChange={(v) => updCustomer(index, "name", v)} />
-                  <Field label="S/o, W/o, D/o" v={customer.father_spouse_name} onChange={(v) => updCustomer(index, "father_spouse_name", v)} />
+                  <Select label="Relationship" v={customer.relation_type} onChange={(v) => updCustomer(index, "relation_type", v)} options={["", "S/o", "W/o", "D/o"]} />
+                  {customer.relation_type && <Field label={`${customer.relation_type} name *`} v={customer.father_spouse_name} onChange={(v) => updCustomer(index, "father_spouse_name", v)} required />}
                   <Field label="Date of birth" v={customer.date_of_birth} onChange={(v) => updCustomer(index, "date_of_birth", v)} type="date" />
                   <TextArea label="Address" v={customer.address} onChange={(v) => updCustomer(index, "address", v)} rows={2} full />
                   <Field label="City" v={customer.city} onChange={(v) => updCustomer(index, "city", v)} />
@@ -213,7 +225,7 @@ export default function NewBookingForm({ role }: { role: string }) {
         </Section>
       </div>
 
-      <aside className="space-y-4 self-start lg:sticky lg:top-24">
+      <aside className="space-y-4 self-start xl:sticky xl:top-24">
         <div className="card p-5 sticky top-24">
           <h3 className="text-sm font-semibold text-slate-900">Live summary</h3>
           <div className="mt-4 space-y-3 text-sm">
@@ -254,11 +266,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>;
 }
-function Field(props: { label: string; v: string; onChange: (v: string) => void; type?: string; min?: number; step?: number }) {
+function Field(props: { label: string; v: string; onChange: (v: string) => void; type?: string; min?: number; step?: number; required?: boolean }) {
   return (
     <div>
       <label className="label">{props.label}</label>
-      <input className="input" value={props.v} onChange={(e) => props.onChange(e.target.value)} type={props.type ?? "text"} min={props.min} step={props.step} />
+      <input className="input" value={props.v} onChange={(e) => props.onChange(e.target.value)} type={props.type ?? "text"} min={props.min} step={props.step} required={props.required} />
     </div>
   );
 }
@@ -275,7 +287,7 @@ function Select(props: { label: string; v: string; onChange: (v: string) => void
     <div>
       <label className="label">{props.label}</label>
       <select className="input" value={props.v} onChange={(e) => props.onChange(e.target.value)}>
-        {props.options.map((o) => <option key={o} value={o}>{o.replaceAll("_", " ")}</option>)}
+        {props.options.map((o) => <option key={o} value={o}>{o ? o.replaceAll("_", " ") : "Select an option"}</option>)}
       </select>
     </div>
   );

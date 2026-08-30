@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { roleAccent, roleLabels } from "@/lib/utils/format";
 import {
   LayoutDashboard, ClipboardList, Wallet, Inbox, BarChart3,
-  ShieldCheck, UserCog, Users, ScrollText, Settings, X, History, Building2, User, LifeBuoy
+  ShieldCheck, UserCog, Users, ScrollText, Settings, X, History, Building2, User, LifeBuoy, MoreHorizontal, ChevronUp
 } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<any>; roles: SessionUser["role"][] };
@@ -28,10 +28,11 @@ const NAV: Item[] = [
 ];
 
 export default function Sidebar({
-  user, mobileOpen, onMobileClose, pendingVerification = 0
+  user, mobileOpen, onMobileOpen, onMobileClose, pendingVerification = 0
 }: {
   user: SessionUser;
   mobileOpen: boolean;
+  onMobileOpen: () => void;
   onMobileClose: () => void;
   /** Payments awaiting verification — badged on the Verification Queue entry. */
   pendingVerification?: number;
@@ -39,6 +40,8 @@ export default function Sidebar({
   const pathname = usePathname();
   const accent = roleAccent[user.role];
   const items = NAV.filter((i) => i.roles.includes(user.role));
+  const primaryItems = items.slice(0, 4);
+  const moreItems = items.slice(4);
 
   const content = (
     <div className="flex h-full w-72 flex-col bg-white border-r border-border">
@@ -122,20 +125,36 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Mobile drawer */}
-      <div className={cn("fixed inset-0 z-40 lg:hidden transition", mobileOpen ? "pointer-events-auto" : "pointer-events-none")}>
-        <div
-          className={cn("absolute inset-0 bg-slate-900/40 transition-opacity", mobileOpen ? "opacity-100" : "opacity-0")}
-          onClick={onMobileClose}
-        />
-        <div className={cn(
-          "absolute left-0 top-0 h-full transition-transform",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}>{content}</div>
+      {/* Mobile bottom navigation and expandable menu */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur xl:hidden">
+        <nav className="grid h-16 grid-cols-5 items-stretch px-1" aria-label="Mobile navigation">
+          {primaryItems.map((it) => {
+            const active = pathname === it.href || pathname.startsWith(it.href + "/");
+            const Icon = it.icon;
+            return <Link key={it.href} href={it.href} onClick={onMobileClose} className={cn("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium", active ? "text-slate-900" : "text-slate-500")}>
+              <span className={cn("grid h-7 w-9 place-items-center rounded-lg", active && "bg-slate-900 text-white")}><Icon className="h-4 w-4" /></span>
+              <span className="max-w-full truncate">{it.label.replace(" Queue", "")}</span>
+            </Link>;
+          })}
+          {moreItems.length > 0 && <button type="button" onClick={() => mobileOpen ? onMobileClose() : onMobileOpen()} className={cn("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium", mobileOpen ? "text-slate-900" : "text-slate-500")} aria-expanded={mobileOpen} aria-label="Open more navigation options">
+            <span className={cn("grid h-7 w-9 place-items-center rounded-lg", mobileOpen && "bg-slate-900 text-white")}><MoreHorizontal className="h-4 w-4" /></span><span>More</span>
+          </button>}
+        </nav>
       </div>
 
+      {moreItems.length > 0 && <div className={cn("fixed inset-0 z-30 xl:hidden transition", mobileOpen ? "pointer-events-auto" : "pointer-events-none")}>
+        <button type="button" aria-label="Close navigation menu" onClick={onMobileClose} className={cn("absolute inset-0 bg-slate-950/35 transition-opacity", mobileOpen ? "opacity-100" : "opacity-0")} />
+        <div className={cn("absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-3 shadow-[0_-16px_48px_rgba(15,23,42,0.2)] transition-transform duration-300 ease-out", mobileOpen ? "translate-y-0" : "translate-y-full")}>
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" />
+          <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-semibold text-slate-900">More sections</h2><p className="text-xs text-slate-500">{roleLabels[user.role]} workspace</p></div><button type="button" onClick={onMobileClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close menu"><ChevronUp className="h-5 w-5" /></button></div>
+          <nav className="grid max-h-[55vh] grid-cols-3 gap-2 overflow-y-auto" aria-label="More navigation">
+            {moreItems.map((it) => { const active = pathname === it.href || pathname.startsWith(it.href + "/"); const Icon = it.icon; return <Link key={it.href} href={it.href} onClick={onMobileClose} className={cn("flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border px-2 text-center text-xs font-medium", active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")}><Icon className="h-5 w-5" /><span>{it.label}</span>{it.href === "/verification" && pendingVerification > 0 && <span className="absolute" aria-label={`${pendingVerification} awaiting verification`} />}</Link>; })}
+          </nav>
+        </div>
+      </div>}
+
       {/* Desktop rail */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden lg:block">{content}</aside>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden xl:block">{content}</aside>
     </>
   );
 }

@@ -98,11 +98,30 @@ export default async function DashboardPage() {
         )}
       </section>
 
+      {(user.role === "ADMIN" || user.role === "DIRECTOR") && (
+        <section className="dashboard-section mt-6">
+          <div className="card p-5">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">{user.role === "DIRECTOR" ? "Organization control" : "Operations control"}</h3>
+                <p className="mt-1 text-xs text-slate-500">{user.role === "DIRECTOR" ? "Manage access, people, and organization oversight." : "Manage verification, support, and daily platform operations."}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(user.role === "DIRECTOR"
+                  ? [["/approvals", "User approvals"], ["/users", "Employees"], ["/audit", "Audit logs"]]
+                  : [["/verification", "Verification"], ["/tickets", "Support"], ["/audit", "Audit logs"]]
+                ).map(([href, label]) => <Link key={href} href={href} className="btn-secondary h-9 text-xs">{label}<ArrowRight className="h-3.5 w-3.5" /></Link>)}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* items-start: each card sizes to its own content. Without it the grid
           stretches every item to the tallest in the row, so a long Payment
           activity list left a large void under Recent bookings. */}
-      <section className="dashboard-section mt-6 grid min-w-0 items-start gap-4 lg:grid-cols-3">
-        <div className="card min-w-0 overflow-hidden p-0 lg:col-span-2">
+      <section className="dashboard-section mt-6 grid min-w-0 items-start gap-4 xl:grid-cols-3">
+        <div className="card min-w-0 overflow-hidden p-0 xl:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Recent bookings</h3>
             <Link href="/bookings" className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-accent">View all <ArrowRight className="h-3 w-3" /></Link>

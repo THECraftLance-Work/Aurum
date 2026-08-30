@@ -110,9 +110,9 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
         }
       />
 
-      <div className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1">
-      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
-        <div className="min-w-0 space-y-4 lg:col-span-2">
+      <div className="h-[calc(100vh-175px)] overflow-y-auto overscroll-contain pr-1">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-3">
+        <div className="min-w-0 space-y-4 xl:col-span-2">
           {/* Status header — the amount is the hero, as in a payments app */}
           <div className={cn("card border", tone.bg, tone.ring)}>
             <div className="flex flex-col items-center py-4 text-center">
@@ -195,7 +195,7 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
           </div>
         </div>
 
-        <aside className="min-w-0 space-y-4 self-start lg:sticky lg:top-24">
+        <aside className="min-w-0 space-y-4 self-start xl:sticky xl:top-24">
           {canReview && (
             <div className="card">
               <h3 className="text-sm font-semibold text-slate-900">Verify this payment</h3>

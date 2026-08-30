@@ -94,10 +94,10 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
   return <div ref={searchRef} className="relative">
     <div className={`relative transition-opacity duration-150 ${open ? "pointer-events-none opacity-0" : "opacity-100"}`}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-      <button type="button" onClick={() => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }} className="input flex h-10 w-full items-center pl-9 pr-16 text-left text-sm text-slate-400" aria-label="Search bookings, customers, and users">Search bookings, customers, users…</button>
+      <button type="button" onClick={() => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }} className="input flex h-10 w-full min-w-0 items-center truncate pl-9 pr-16 text-left text-sm text-slate-400" aria-label="Search bookings, customers, and users">Search bookings, customers, users…</button>
       <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 sm:flex"><span className="kbd">Ctrl</span><span className="kbd">K</span></span>
     </div>
-    {open && <div className="search-panel-enter absolute left-0 right-0 top-0 z-50" role="dialog" aria-modal="false" aria-label="Global search">
+    {open && <div className="search-panel-enter absolute left-[50vw] top-0 z-50 w-[calc(100vw-1.5rem)] -translate-x-1/2 sm:left-0 sm:right-0 sm:w-auto sm:translate-x-0" role="dialog" aria-modal="false" aria-label="Global search">
       <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.45)]">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <Search className="h-5 w-5 shrink-0 text-slate-400" />

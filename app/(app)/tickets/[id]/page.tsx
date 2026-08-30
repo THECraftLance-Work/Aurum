@@ -50,9 +50,9 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
         }
       />
 
-      <div className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1">
-      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
-        <div className="min-w-0 space-y-4 lg:col-span-2">
+      <div className="h-[calc(100vh-175px)] overflow-y-auto overscroll-contain pr-1">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-3">
+        <div className="min-w-0 space-y-4 xl:col-span-2">
           <div className="card">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Description</h3>
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{t.description}</p>
@@ -66,7 +66,7 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
           />
         </div>
 
-        <aside className="min-w-0 space-y-4 self-start lg:sticky lg:top-24">
+        <aside className="min-w-0 space-y-4 self-start xl:sticky xl:top-24">
           <div className="card">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Details</h3>
             <dl className="space-y-2.5 text-sm">

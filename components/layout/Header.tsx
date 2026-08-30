@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { Bell, Menu, LogOut, LifeBuoy } from "lucide-react";
+import { Bell, LogOut, LifeBuoy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import type { SessionUser } from "@/lib/auth/session";
@@ -10,7 +10,7 @@ import RaiseTicketModal from "@/components/tickets/RaiseTicketModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { isNotificationCategoryEnabled, playNotificationSound, showBrowserNotification } from "@/lib/utils/notification-client";
 
-export default function Header({ user, onMenu }: { user: SessionUser; onMenu: () => void }) {
+export default function Header({ user }: { user: SessionUser }) {
   const router = useRouter();
   const supabase = createSupabaseBrowser();
   const [unread, setUnread] = useState(0);
@@ -54,15 +54,8 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-border bg-white/95 backdrop-blur">
-        <div className="flex h-16 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 flex-1 max-w-xl min-w-0">
-            <button
-              className="lg:hidden rounded-lg p-2 transition-colors hover:bg-slate-100"
-              onClick={onMenu}
-              aria-label="Open navigation"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+        <div className="flex h-14 w-full items-center justify-between gap-2 px-3 sm:h-16 sm:gap-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 max-w-xl flex-1 items-center gap-2 sm:gap-3">
             <div className="min-w-0 flex-1">
               <GlobalSearch user={user} />
             </div>
