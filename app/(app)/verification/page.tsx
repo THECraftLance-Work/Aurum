@@ -30,10 +30,11 @@ const BOOKING_TABS = [
 
 export default async function VerificationPage({
   searchParams
-}: { searchParams: { tab?: string } }) {
+}: { searchParams: Promise<{ tab?: string }> }) {
+  const filters = await searchParams;
   await requireRole(["ACCOUNTANT", "ADMIN", "DIRECTOR"]);
-  const supabase = createSupabaseServer();
-  const activeKey = searchParams.tab ?? "PAYMENTS";
+  const supabase = await createSupabaseServer();
+  const activeKey = filters.tab ?? "PAYMENTS";
   const bookingTab = BOOKING_TABS.find((t) => t.key === activeKey);
 
   // The pending-payment count drives the tab badge, so it's always fetched.

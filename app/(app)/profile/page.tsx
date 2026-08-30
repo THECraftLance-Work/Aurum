@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
   const sessionUser = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
 
   const { data: profile } = await supabase
     .from("app_users")

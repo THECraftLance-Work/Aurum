@@ -11,15 +11,16 @@ import { cn } from "@/lib/utils/cn";
 
 export const dynamic = "force-dynamic";
 
-export default async function TicketDetail({ params }: { params: { id: string } }) {
+export default async function TicketDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
 
   // RLS returns nothing if this user isn't the raiser, assignee, or staff.
   const { data: t } = await supabase
     .from("tickets")
     .select("*, raiser:raised_by(name, role, email), assignee:assigned_to(name), resolver:resolved_by(name)")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
   if (!t) notFound();
 
@@ -49,6 +50,7 @@ export default async function TicketDetail({ params }: { params: { id: string } 
         }
       />
 
+      <div className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1">
       <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
           <div className="card">
@@ -64,7 +66,7 @@ export default async function TicketDetail({ params }: { params: { id: string } 
           />
         </div>
 
-        <aside className="min-w-0 space-y-4">
+        <aside className="min-w-0 space-y-4 self-start lg:sticky lg:top-24">
           <div className="card">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Details</h3>
             <dl className="space-y-2.5 text-sm">
@@ -108,6 +110,7 @@ export default async function TicketDetail({ params }: { params: { id: string } 
             />
           )}
         </aside>
+      </div>
       </div>
     </>
   );

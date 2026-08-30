@@ -1,18 +1,19 @@
 import Link from "next/link";
 import { Eye } from "lucide-react";
-import { requireUser } from "@/lib/auth/session";
+import { requireRole } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import UserActionRow from "@/components/users/UserActionRow";
 import { formatDate, roleAccent, roleLabels } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import AddEmployeeButton from "@/components/users/AddEmployeeButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
-  const currentUser = await requireUser();
-  const supabase = createSupabaseServer();
+  const currentUser = await requireRole(["ADMIN", "DIRECTOR"]);
+  const supabase = await createSupabaseServer();
   const { data: users } = await supabase
     .from("app_users")
     .select("id, name, email, role, status, auth_provider, created_at")
@@ -23,9 +24,9 @@ export default async function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Users" description="All accounts across the organization." />
+      <PageHeader title="Users" description="All accounts across the organization." actions={isDirector ? <AddEmployeeButton /> : undefined} />
       <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="max-h-[calc(100vh-220px)] overflow-auto overscroll-contain">
           <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-left">
             <tr>
@@ -88,4 +89,3 @@ export default async function UsersPage() {
     </>
   );
 }
-

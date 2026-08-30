@@ -6,13 +6,14 @@ import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function PublicBookingPage({ params }: { params: { id: string } }) {
+export default async function PublicBookingPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const admin = createSupabaseAdmin();
 
   const { data: b } = await admin
     .from("bookings")
     .select("*, customer:customer_id(*), creator:created_by(name, role, email)")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
   if (!b) notFound();
 
@@ -36,7 +37,7 @@ export default async function PublicBookingPage({ params }: { params: { id: stri
             <span className="text-sm font-bold tracking-tight text-slate-900">Aurum</span>
             <span className="hidden text-xs text-slate-400 sm:inline">Real Estate</span>
           </Link>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">No login required · Unique ID {params.id.slice(0, 8)}</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">No login required · Unique ID {id.slice(0, 8)}</span>
         </div>
       </header>
 

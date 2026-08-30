@@ -9,8 +9,9 @@ const Body = z.object({
   is_internal: z.boolean().optional()
 });
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServer();
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -25,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const admin = createSupabaseAdmin();
   const { data: t } = await admin
-    .from("tickets").select("id, ticket_number, raised_by, assigned_to, status").eq("id", params.id).maybeSingle();
+    .from("tickets").select("id, ticket_number, raised_by, assigned_to, status").eq("id", id).maybeSingle();
   if (!t) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
 
   const isStaff = ["ADMIN", "DIRECTOR"].includes(actor.role);

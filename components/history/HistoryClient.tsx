@@ -51,7 +51,7 @@ export default function HistoryClient({ entries }: { entries: Entry[] }) {
         </div>
       </div>
 
-      <ol className="relative">
+      <ol className="relative h-[calc(100vh-285px)] overflow-y-auto overscroll-contain">
         {filtered.map((e, i) => {
           const Icon = KIND_ICONS[e.kind];
           const color = KIND_COLORS[e.kind];

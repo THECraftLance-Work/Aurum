@@ -16,7 +16,7 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

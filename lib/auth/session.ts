@@ -20,7 +20,7 @@ export type SessionUser = {
  * fetched. Now they share one result.
  */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 

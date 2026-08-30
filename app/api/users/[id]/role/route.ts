@@ -15,8 +15,9 @@ const Body = z.object({ role: z.enum(VALID_ROLES) });
  * `status`, nulls `approved_at` on revoke, and always notifies with
  * "Your access has been approved" — all wrong for a role change.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServer();
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -25,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!actor || actor.status !== "APPROVED" || actor.role !== "DIRECTOR") {
     return NextResponse.json({ error: "Only a Director can change roles." }, { status: 403 });
   }
-  if (actor.id === params.id) {
+  if (actor.id === id) {
     return NextResponse.json({ error: "You cannot change your own role." }, { status: 400 });
   }
 
@@ -35,7 +36,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const admin = createSupabaseAdmin();
   const { data: target } = await admin
-    .from("app_users").select("id, name, role, status").eq("id", params.id).maybeSingle();
+    .from("app_users").select("id, name, role, status").eq("id", id).maybeSingle();
   if (!target) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
   if (target.role === nextRole) {

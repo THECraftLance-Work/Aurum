@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ApprovalsPage() {
   await requireRole(["DIRECTOR"]);
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: users } = await supabase
     .from("app_users")
     .select("*")
@@ -26,7 +26,7 @@ export default async function ApprovalsPage() {
         {(!users || users.length === 0) ? (
           <EmptyState title="No pending requests" description="Newly registered users will appear here." />
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="max-h-[calc(100vh-250px)] divide-y divide-border overflow-y-auto overscroll-contain">
             {users.map((u: any) => (
               <li key={u.id} className="p-5 flex flex-wrap items-center gap-4">
                 <div className="grid h-11 w-11 place-items-center rounded-full bg-slate-900 text-white font-semibold">

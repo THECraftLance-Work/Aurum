@@ -1,20 +1,20 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth/session";
+import { requireRole } from "@/lib/auth/session";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import UserDetailClient from "@/components/users/UserDetailClient";
 import type { DocUrl } from "@/components/users/UserDetailClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function DirectorUserDetail({ params }: { params: { id: string } }) {
-  const actor = await requireUser();
-  if (!["DIRECTOR", "ADMIN"].includes(actor.role)) notFound();
+export default async function DirectorUserDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const actor = await requireRole(["ADMIN", "DIRECTOR"]);
 
   const admin = createSupabaseAdmin();
   const { data: u } = await admin
     .from("app_users")
     .select("id, name, email, phone, role, status, auth_provider, employee_id, requested_role, avatar_url, approved_at, last_login_at, created_at")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
   if (!u) notFound();
 

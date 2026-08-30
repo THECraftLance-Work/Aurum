@@ -8,6 +8,7 @@ import GlobalSearch from "./GlobalSearch";
 import NotificationsDrawer from "@/components/notifications/NotificationsDrawer";
 import RaiseTicketModal from "@/components/tickets/RaiseTicketModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { isNotificationCategoryEnabled, playNotificationSound, showBrowserNotification } from "@/lib/utils/notification-client";
 
 export default function Header({ user, onMenu }: { user: SessionUser; onMenu: () => void }) {
   const router = useRouter();
@@ -29,6 +30,14 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
     load();
     const ch = supabase
       .channel(`notif-${user.id}`)
+      .on("postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${user.id}` },
+        (payload) => {
+          const notification = payload.new as { category?: string; priority?: string; title?: string; message?: string };
+          if (!isNotificationCategoryEnabled(notification.category ?? "")) return;
+          if (["HIGH", "URGENT"].includes(notification.priority ?? "")) playNotificationSound();
+          showBrowserNotification(notification.title ?? "Aurum notification", notification.message ?? "You have a new update.");
+        })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${user.id}` },
         load)
@@ -55,7 +64,7 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
               <Menu className="h-5 w-5" />
             </button>
             <div className="min-w-0 flex-1">
-              <GlobalSearch />
+              <GlobalSearch user={user} />
             </div>
           </div>
 
@@ -68,11 +77,12 @@ export default function Header({ user, onMenu }: { user: SessionUser; onMenu: ()
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setTicketOpen(true)}
-              className="rounded-xl border border-border bg-white p-2.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-white px-3 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
               aria-label="Raise a support ticket"
               title="Raise a support ticket"
             >
               <LifeBuoy className="h-4 w-4 text-slate-600" />
+              <span className="hidden text-xs font-semibold text-slate-700 xl:inline">Raise a Ticket</span>
             </button>
 
             <button

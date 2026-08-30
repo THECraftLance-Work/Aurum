@@ -16,10 +16,11 @@ const TABS = [
   { key: "ALL", label: "All", statuses: [] as string[] }
 ];
 
-export default async function TicketsPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const filters = await searchParams;
   const user = await requireUser();
-  const supabase = createSupabaseServer();
-  const tab = TABS.find((t) => t.key === (searchParams.tab ?? "OPEN")) ?? TABS[0];
+  const supabase = await createSupabaseServer();
+  const tab = TABS.find((t) => t.key === (filters.tab ?? "OPEN")) ?? TABS[0];
 
   // RLS scopes this automatically: raisers see their own, ADMIN/DIRECTOR see all.
   let q = supabase
@@ -61,7 +62,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: { ta
             description={isStaff ? "Nothing needs attention right now." : "Raise one from the life-ring icon in the header."}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[calc(100vh-250px)] overflow-auto overscroll-contain">
             <table className="w-full table-fixed text-sm">
               <colgroup>
                 <col className="w-[120px]" />

@@ -1,34 +1,13 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
-import { ArrowRight } from "lucide-react";
 import PremiumLoader from "@/components/ui/PremiumLoader";
 
 export default function LoginForm() {
-  const router = useRouter();
   const supabase = createSupabaseBrowser();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setLoadingMessage("Authenticating session credentials...");
-    setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setBusy(false);
-      setLoadingMessage(null);
-      return setError(error.message);
-    }
-    setLoadingMessage("Entering Aurum Platform...");
-    router.replace("/dashboard");
-    router.refresh();
-  }
 
   async function google() {
     setBusy(true);
@@ -55,7 +34,7 @@ export default function LoginForm() {
         />
       )}
 
-      <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-4">
         <button
           type="button"
           onClick={google}
@@ -66,57 +45,13 @@ export default function LoginForm() {
           <span>Continue with Google</span>
         </button>
 
-      <div className="relative py-2">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-[var(--color-divider)]" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-[var(--color-bg)] px-3 text-[11px] uppercase tracking-wider text-neutral-500 font-medium">
-            or sign in with email
-          </span>
-        </div>
-      </div>
-
-      <div>
-        <label className="label">Work email</label>
-        <input
-          className="input"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="priya.nair@aurum.com"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between">
-          <label className="label">Password</label>
-        </div>
-        <input
-          className="input"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••••••"
-        />
-      </div>
-
       {error && (
         <div className="border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">
           {error}
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="flex w-full items-center justify-center gap-2 bg-[#ec3013] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#dd2b0f] disabled:opacity-50 cursor-pointer"
-      >
-        {busy ? "Signing in..." : <>Enter platform <ArrowRight className="h-4 w-4" /></>}
-      </button>
-    </form>
+    </div>
     </>
   );
 }
@@ -131,4 +66,3 @@ function GoogleIcon() {
     </svg>
   );
 }
-

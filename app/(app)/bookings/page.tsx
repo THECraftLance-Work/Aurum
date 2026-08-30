@@ -16,11 +16,12 @@ const PAGE_SIZE = 50;
 
 export default async function BookingsPage({
   searchParams
-}: { searchParams: { status?: string; q?: string; customer?: string; page?: string } }) {
+}: { searchParams: Promise<{ status?: string; q?: string; customer?: string; page?: string }> }) {
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
+  const filters = await searchParams;
 
-  const page = Math.max(1, Number(searchParams.page ?? 1) || 1);
+  const page = Math.max(1, Number(filters.page ?? 1) || 1);
   const from = (page - 1) * PAGE_SIZE;
 
   let query = supabase
@@ -33,13 +34,13 @@ export default async function BookingsPage({
     .range(from, from + PAGE_SIZE - 1);
 
   if (["SM", "CP"].includes(user.role)) query = query.eq("created_by", user.id);
-  if (searchParams.status) query = query.eq("status", searchParams.status);
-  if (searchParams.customer) query = query.eq("customer_id", searchParams.customer);
-  if (searchParams.q) {
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.customer) query = query.eq("customer_id", filters.customer);
+  if (filters.q) {
     // Strip characters that terminate or re-parse a PostgREST or() group:
     // %, comma, parentheses, dot and backslash. Without this a query like
     // "A-1)" produces a malformed filter and a 400.
-    const term = `%${searchParams.q.replace(/[%,()\.]/g, " ").trim()}%`;
+    const term = `%${filters.q.replace(/[%,()\.]/g, " ").trim()}%`;
     query = query.or(`booking_id.ilike.${term},project_name.ilike.${term},unit_number.ilike.${term}`);
   }
 
@@ -49,9 +50,9 @@ export default async function BookingsPage({
 
   function pageHref(p: number) {
     const sp = new URLSearchParams();
-    if (searchParams.status) sp.set("status", searchParams.status);
-    if (searchParams.q) sp.set("q", searchParams.q);
-    if (searchParams.customer) sp.set("customer", searchParams.customer);
+    if (filters.status) sp.set("status", filters.status);
+    if (filters.q) sp.set("q", filters.q);
+    if (filters.customer) sp.set("customer", filters.customer);
     sp.set("page", String(p));
     return `/bookings?${sp.toString()}`;
   }
@@ -81,7 +82,7 @@ export default async function BookingsPage({
           <>
             {/* Desktop: fixed-layout table so a long unbroken string truncates
                 instead of blowing out the column widths. */}
-            <div className="hidden overflow-x-auto sm:block">
+            <div className="hidden max-h-[calc(100vh-250px)] overflow-auto overscroll-contain sm:block">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[120px]" />
@@ -139,7 +140,7 @@ export default async function BookingsPage({
             </div>
 
             {/* Mobile: stacked cards rather than a shrunken table. */}
-            <ul className="divide-y divide-border sm:hidden">
+            <ul className="max-h-[calc(100vh-250px)] divide-y divide-border overflow-y-auto overscroll-contain sm:hidden">
               {bookings.map((b: any) => (
                 <li key={b.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">

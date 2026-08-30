@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    */
   let pendingVerification = 0;
   if (["ACCOUNTANT", "ADMIN", "DIRECTOR"].includes(user.role)) {
-    const supabase = createSupabaseServer();
+    const supabase = await createSupabaseServer();
     const { count } = await supabase
       .from("payments")
       .select("id", { count: "exact", head: true })

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HistoryPage() {
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const own = ["SM","CP"].includes(user.role);
 
   const bq = own

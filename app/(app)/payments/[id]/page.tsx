@@ -25,9 +25,10 @@ const MODE_LABEL: Record<string, string> = {
   OTHER: "Other"
 };
 
-export default async function PaymentDetail({ params }: { params: { id: string } }) {
+export default async function PaymentDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
 
   const { data: p } = await supabase
     .from("payments")
@@ -37,7 +38,7 @@ export default async function PaymentDetail({ params }: { params: { id: string }
       submitted_by,
       reviewed_by
     `)
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (!p) notFound();
@@ -109,6 +110,7 @@ export default async function PaymentDetail({ params }: { params: { id: string }
         }
       />
 
+      <div className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1">
       <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
           {/* Status header — the amount is the hero, as in a payments app */}
@@ -193,7 +195,7 @@ export default async function PaymentDetail({ params }: { params: { id: string }
           </div>
         </div>
 
-        <aside className="min-w-0 space-y-4">
+        <aside className="min-w-0 space-y-4 self-start lg:sticky lg:top-24">
           {canReview && (
             <div className="card">
               <h3 className="text-sm font-semibold text-slate-900">Verify this payment</h3>
@@ -248,6 +250,7 @@ export default async function PaymentDetail({ params }: { params: { id: string }
             </div>
           )}
         </aside>
+      </div>
       </div>
     </>
   );

@@ -11,8 +11,9 @@ const Body = z.object({
   resolution_note: z.string().trim().max(4000).optional()
 });
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServer();
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -28,7 +29,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const admin = createSupabaseAdmin();
   const { data: t } = await admin
-    .from("tickets").select("*").eq("id", params.id).maybeSingle();
+    .from("tickets").select("*").eq("id", id).maybeSingle();
   if (!t) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
 
   // Mirrors the booking-review rule: a resolution must say what was done.

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function InboxPage() {
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: notifications } = await supabase
     .from("notifications")
     .select("*")

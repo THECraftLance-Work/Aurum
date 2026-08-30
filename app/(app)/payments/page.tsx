@@ -29,14 +29,15 @@ const TABS = [
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; page?: string };
+  searchParams: Promise<{ tab?: string; page?: string }>;
 }) {
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
+  const filters = await searchParams;
 
   const tab =
-    TABS.find((t) => t.key === (searchParams.tab ?? "ALL")) ?? TABS[0];
-  const page = Math.max(1, Number(searchParams.page ?? 1) || 1);
+    TABS.find((t) => t.key === (filters.tab ?? "ALL")) ?? TABS[0];
+  const page = Math.max(1, Number(filters.page ?? 1) || 1);
   const from = (page - 1) * PAGE_SIZE;
 
   // Only the columns the table renders — the old `select("*")` pulled notes,
@@ -95,7 +96,7 @@ export default async function PaymentsPage({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto sm:block">
+            <div className="hidden min-h-0 max-h-[calc(100vh-280px)] overflow-auto overscroll-contain sm:block">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[170px]" />
@@ -208,7 +209,7 @@ export default async function PaymentsPage({
             </div>
 
             {/* Mobile: a transaction list, closer to how a payments app reads */}
-            <ul className="divide-y divide-border sm:hidden">
+            <ul className="max-h-[calc(100vh-280px)] divide-y divide-border overflow-y-auto overscroll-contain sm:hidden">
               {payments.map((p: any) => {
                 const bk = Array.isArray(p.booking) ? p.booking[0] : p.booking;
                 return (

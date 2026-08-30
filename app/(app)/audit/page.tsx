@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
   await requireRole(["ADMIN","DIRECTOR"]);
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: logs } = await supabase
     .from("audit_logs")
     .select("id, action, entity_type, actor_role, reason, created_at, actor:actor_user_id(name, role)")
@@ -23,7 +23,7 @@ export default async function AuditPage() {
         {(!logs || logs.length === 0) ? (
           <EmptyState title="No audit records yet" description="Activity will appear here as soon as users act." />
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="max-h-[calc(100vh-250px)] divide-y divide-border overflow-y-auto overscroll-contain">
             {logs.map((l: any) => {
               const accent = roleAccent[l.actor_role] ?? roleAccent.SM;
               return (

@@ -57,9 +57,9 @@ const config: Config = {
         lift: "0 6px 20px -4px rgba(45, 43, 43, 0.14)"
       },
       fontFamily: {
-        sans: ["var(--font-archivo)", "Archivo", "system-ui", "-apple-system", "sans-serif"],
-        heading: ["var(--font-archivo)", "Archivo", "system-ui", "-apple-system", "sans-serif"],
-        mono: ["var(--font-jetbrains-mono)", "JetBrains Mono", "monospace"]
+        sans: ["Archivo", "system-ui", "-apple-system", "sans-serif"],
+        heading: ["Archivo", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"]
       },
       transitionTimingFunction: {
         "out-quint": "cubic-bezier(0.22, 1, 0.36, 1)",

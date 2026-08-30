@@ -89,11 +89,11 @@ export default function RaiseTicketModal({ open, onClose }: { open: boolean; onC
   }
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Raise a support ticket">
+    <div className="fixed inset-0 z-[65] flex items-stretch justify-end" role="dialog" aria-modal="true" aria-label="Raise a support ticket">
       <div className="absolute inset-0 bg-slate-900/40 animate-fade-in" onClick={() => !busy && onClose()} />
       <form
         onSubmit={submit}
-        className="relative my-8 w-full max-w-lg rounded-2xl border border-border bg-white shadow-pop animate-scale-in sm:my-0"
+        className="relative h-full w-full max-w-lg overflow-y-auto border-l border-border bg-white shadow-pop animate-slide-in-right"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2.5">

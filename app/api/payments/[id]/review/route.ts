@@ -23,8 +23,9 @@ const Body = z.object({
  * the recalc trigger only sums APPROVED rows. The booking's remaining balance
  * was silently wrong.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServer();
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { data: pay } = await admin
     .from("payments")
     .select("id, amount, status, payment_mode, reference_no, payment_date, submitted_by, booking_id, booking:booking_id(id, booking_id, total_property_value, total_amount_paid, customer:customer_id(name, email))")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (!pay) return NextResponse.json({ error: "Payment not found." }, { status: 404 });

@@ -5,7 +5,7 @@ import { notifyRole, writeAudit } from "@/lib/utils/notifications";
 import { dispatchOutbound } from "@/lib/integrations/outbound";
 
 export async function POST(req: Request) {
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -19,9 +19,11 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { customer, booking, initialPayment, previousPayments, attachment } = body ?? {};
+  const { customer, customers, booking, initialPayment, previousPayments, attachment } = body ?? {};
 
-  if (!customer?.name || !booking?.project_name || !booking?.unit_number || !booking?.total_property_value) {
+  const customerList = Array.isArray(customers) && customers.length ? customers : [customer];
+
+  if (!customerList[0]?.name || !booking?.project_name || !booking?.unit_number || !booking?.total_property_value) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
   const totalValue = Number(booking.total_property_value);
@@ -37,9 +39,10 @@ export async function POST(req: Request) {
   const { data: cust, error: custErr } = await admin
     .from("customers")
     .insert({
-      name: customer.name,
-      phone: customer.phone ?? null,
-      email: customer.email ?? null,
+      name: customerList[0].name,
+      phone: customerList[0].phone ?? null,
+      email: customerList[0].email ?? null,
+      ...customerList[0],
       created_by: profile.id
     })
     .select("id")
@@ -63,6 +66,32 @@ export async function POST(req: Request) {
       bank_branch: booking.bank_branch ?? null,
       loan_sanctioned: Boolean(booking.loan_sanctioned),
       loan_amount: booking.loan_amount ?? null,
+      sales_representative: booking.sales_representative ?? null,
+      team_manager: booking.team_manager ?? null,
+      booking_place: booking.booking_place ?? null,
+      booking_date: booking.booking_date ?? null,
+      block: booking.block ?? null,
+      facing: booking.facing ?? null,
+      saleable_area: booking.saleable_area ?? null,
+      carpet_area: booking.carpet_area ?? null,
+      external_walls_area: booking.external_walls_area ?? null,
+      balcony_utility_area: booking.balcony_utility_area ?? null,
+      common_area: booking.common_area ?? null,
+      base_price: booking.base_price ?? null,
+      floor_rise_charges: booking.floor_rise_charges ?? null,
+      east_facing_charges: booking.east_facing_charges ?? null,
+      premium_view_charges: booking.premium_view_charges ?? null,
+      amenities_charges: booking.amenities_charges ?? null,
+      car_parking_charges: booking.car_parking_charges ?? null,
+      legal_documentation_charges: booking.legal_documentation_charges ?? null,
+      sale_consideration_per_sqft: booking.sale_consideration_per_sqft ?? null,
+      source_of_booking: booking.source_of_booking ?? null,
+      referral_customer_name: booking.referral_customer_name ?? null,
+      referral_project_name: booking.referral_project_name ?? null,
+      cp_agent_name: booking.cp_agent_name ?? null,
+      cp_rera_id: booking.cp_rera_id ?? null,
+      payment_source: booking.payment_source ?? null,
+      purchase_purpose: booking.purchase_purpose ?? null,
       status: "SUBMITTED",
       created_by: profile.id,
       creator_role: profile.role,
@@ -71,6 +100,22 @@ export async function POST(req: Request) {
     .select("id, booking_id")
     .single();
   if (bkErr) return NextResponse.json({ error: bkErr.message }, { status: 500 });
+
+  // Link every buyer/co-buyer. The first person remains the legacy primary
+  // customer on bookings.customer_id.
+  const customerRows: { booking_id: string; customer_id: string; is_primary: boolean }[] = [];
+  for (const [index, person] of customerList.entries()) {
+    if (!person?.name) continue;
+    let customerId = index === 0 ? cust.id : null;
+    if (!customerId) {
+      const { data: extra, error: extraErr } = await admin.from("customers").insert({ ...person, name: person.name.trim(), phone: person.phone?.trim() || null, email: person.email?.trim() || null, created_by: profile.id }).select("id").single();
+      if (extraErr) return NextResponse.json({ error: extraErr.message }, { status: 500 });
+      customerId = extra.id;
+    }
+    customerRows.push({ booking_id: bk.id, customer_id: customerId, is_primary: index === 0 });
+  }
+  const { error: linkErr } = await admin.from("booking_customers").insert(customerRows);
+  if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
 
   // 3. Seed previous payments as one aggregate APPROVED record if > 0
   if (previous > 0) {
@@ -149,8 +194,8 @@ export async function POST(req: Request) {
       bookingRef: bk.booking_id,
       bookingUuid: bk.id,
       submitterName: profile.name,
-      customerName: customer.name,
-      customerEmail: customer.email ?? null,
+      customerName: customerList[0].name,
+      customerEmail: customerList[0].email ?? null,
       project: booking.project_name,
       unit: booking.unit_number,
       totalValue

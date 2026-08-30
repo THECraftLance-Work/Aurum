@@ -11,10 +11,9 @@ export default function NewBookingForm({ role }: { role: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doc, setDoc] = useState<UploadedFile | null>(null);
+  const emptyCustomer = { title: "", name: "", father_spouse_name: "", date_of_birth: "", address: "", city: "", state: "", country: "India", pin_code: "", phone: "", alternate_phone: "", email: "", alternate_email: "", pan_number: "", aadhaar_number: "", occupation: "", organization: "", designation: "" };
+  const [customers, setCustomers] = useState([emptyCustomer]);
   const [form, setForm] = useState({
-    customer_name: "",
-    customer_phone: "",
-    customer_email: "",
     project_name: "",
     unit_number: "",
     property_details: "",
@@ -31,10 +30,17 @@ export default function NewBookingForm({ role }: { role: string }) {
     bank_ifsc: "",
     bank_branch: "",
     loan_sanctioned: "no",
-    loan_amount: ""
+    loan_amount: "",
+    sales_representative: "", team_manager: "", booking_place: "", booking_date: new Date().toISOString().slice(0, 10), block: "", facing: "",
+    saleable_area: "", carpet_area: "", external_walls_area: "", balcony_utility_area: "", common_area: "",
+    base_price: "", floor_rise_charges: "", east_facing_charges: "", premium_view_charges: "", amenities_charges: "", car_parking_charges: "", legal_documentation_charges: "", sale_consideration_per_sqft: "",
+    source_of_booking: "", referral_customer_name: "", referral_project_name: "", cp_agent_name: "", cp_rera_id: "", payment_source: "", purchase_purpose: ""
   });
 
   function upd<K extends keyof typeof form>(k: K, v: string) { setForm((f) => ({ ...f, [k]: v })); }
+  function updCustomer(index: number, key: keyof typeof emptyCustomer, value: string) {
+    setCustomers((items) => items.map((item, i) => i === index ? { ...item, [key]: value } : item));
+  }
 
   const total = Number(form.total_property_value || 0);
   const previous = Number(form.previous_payments || 0);
@@ -47,7 +53,7 @@ export default function NewBookingForm({ role }: { role: string }) {
     && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bank_ifsc.trim());
 
   const valid = useMemo(() => {
-    return Boolean(form.customer_name && form.project_name && form.unit_number)
+    return Boolean(customers[0]?.name.trim() && form.project_name && form.unit_number)
       && total > 0 && totalPaid <= total && !ifscInvalid;
   }, [form, total, totalPaid, ifscInvalid]);
 
@@ -58,11 +64,7 @@ export default function NewBookingForm({ role }: { role: string }) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        customer: {
-          name: form.customer_name.trim(),
-          phone: form.customer_phone.trim() || null,
-          email: form.customer_email.trim() || null
-        },
+        customers: customers.map((c) => ({ ...c, name: c.name.trim(), phone: c.phone.trim() || null, email: c.email.trim() || null })),
         booking: {
           project_name: form.project_name.trim(),
           unit_number: form.unit_number.trim(),
@@ -75,7 +77,15 @@ export default function NewBookingForm({ role }: { role: string }) {
           bank_ifsc: form.bank_ifsc.trim() || null,
           bank_branch: form.bank_branch.trim() || null,
           loan_sanctioned: form.loan_sanctioned === "yes",
-          loan_amount: form.loan_sanctioned === "yes" && form.loan_amount ? Number(form.loan_amount) : null
+          loan_amount: form.loan_sanctioned === "yes" && form.loan_amount ? Number(form.loan_amount) : null,
+          sales_representative: form.sales_representative.trim() || null, team_manager: form.team_manager.trim() || null, booking_place: form.booking_place.trim() || null, booking_date: form.booking_date || null,
+          block: form.block.trim() || null, facing: form.facing.trim() || null, saleable_area: Number(form.saleable_area) || null, carpet_area: Number(form.carpet_area) || null,
+          external_walls_area: Number(form.external_walls_area) || null, balcony_utility_area: Number(form.balcony_utility_area) || null, common_area: Number(form.common_area) || null,
+          base_price: Number(form.base_price) || null, floor_rise_charges: Number(form.floor_rise_charges) || null, east_facing_charges: Number(form.east_facing_charges) || null,
+          premium_view_charges: Number(form.premium_view_charges) || null, amenities_charges: Number(form.amenities_charges) || null, car_parking_charges: Number(form.car_parking_charges) || null,
+          legal_documentation_charges: Number(form.legal_documentation_charges) || null, sale_consideration_per_sqft: Number(form.sale_consideration_per_sqft) || null,
+          source_of_booking: form.source_of_booking.trim() || null, referral_customer_name: form.referral_customer_name.trim() || null, referral_project_name: form.referral_project_name.trim() || null,
+          cp_agent_name: form.cp_agent_name.trim() || null, cp_rera_id: form.cp_rera_id.trim() || null, payment_source: form.payment_source.trim() || null, purchase_purpose: form.purchase_purpose.trim() || null
         },
         attachment: doc
           ? { storagePath: doc.storagePath, name: doc.name, size: doc.size, type: doc.type }
@@ -97,21 +107,69 @@ export default function NewBookingForm({ role }: { role: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-4 lg:grid-cols-3">
+    <form onSubmit={submit} className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1 grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-4">
         <Section title="Customer details">
-          <Grid>
-            <Field label="Customer name *" v={form.customer_name} onChange={(v) => upd("customer_name", v)} />
-            <Field label="Phone" v={form.customer_phone} onChange={(v) => upd("customer_phone", v)} />
-            <Field label="Email" v={form.customer_email} onChange={(v) => upd("customer_email", v)} type="email" />
-          </Grid>
+          <div className="space-y-4">
+            {customers.map((customer, index) => (
+              <div key={index} className="rounded-xl border border-border p-4">
+                <div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{index === 0 ? "Primary customer" : `Additional customer ${index + 1}`}</span>{index > 0 && <button type="button" className="text-xs text-rose-600" onClick={() => setCustomers(items => items.filter((_, i) => i !== index))}>Remove</button>}</div>
+                <Grid>
+                  <Field label="Title" v={customer.title} onChange={(v) => updCustomer(index, "title", v)} />
+                  <Field label="Full name *" v={customer.name} onChange={(v) => updCustomer(index, "name", v)} />
+                  <Field label="S/o, W/o, D/o" v={customer.father_spouse_name} onChange={(v) => updCustomer(index, "father_spouse_name", v)} />
+                  <Field label="Date of birth" v={customer.date_of_birth} onChange={(v) => updCustomer(index, "date_of_birth", v)} type="date" />
+                  <TextArea label="Address" v={customer.address} onChange={(v) => updCustomer(index, "address", v)} rows={2} full />
+                  <Field label="City" v={customer.city} onChange={(v) => updCustomer(index, "city", v)} />
+                  <Field label="State" v={customer.state} onChange={(v) => updCustomer(index, "state", v)} />
+                  <Field label="Country" v={customer.country} onChange={(v) => updCustomer(index, "country", v)} />
+                  <Field label="PIN code" v={customer.pin_code} onChange={(v) => updCustomer(index, "pin_code", v)} />
+                  <Field label="Phone" v={customer.phone} onChange={(v) => updCustomer(index, "phone", v)} />
+                  <Field label="Alternate phone" v={customer.alternate_phone} onChange={(v) => updCustomer(index, "alternate_phone", v)} />
+                  <Field label="Email" v={customer.email} onChange={(v) => updCustomer(index, "email", v)} type="email" />
+                  <Field label="Alternate email" v={customer.alternate_email} onChange={(v) => updCustomer(index, "alternate_email", v)} type="email" />
+                  <Field label="PAN number" v={customer.pan_number} onChange={(v) => updCustomer(index, "pan_number", v.toUpperCase())} />
+                  <Field label="Aadhaar number" v={customer.aadhaar_number} onChange={(v) => updCustomer(index, "aadhaar_number", v)} />
+                  <Field label="Occupation" v={customer.occupation} onChange={(v) => updCustomer(index, "occupation", v)} />
+                  <Field label="Organization" v={customer.organization} onChange={(v) => updCustomer(index, "organization", v)} />
+                  <Field label="Designation" v={customer.designation} onChange={(v) => updCustomer(index, "designation", v)} />
+                </Grid>
+              </div>
+            ))}
+            <button type="button" className="btn-secondary h-10 text-sm" onClick={() => setCustomers(items => [...items, { ...emptyCustomer }])}>+ Add another person</button>
+          </div>
         </Section>
 
         <Section title="Booking details">
           <Grid>
+            <Field label="Sales representative" v={form.sales_representative} onChange={(v) => upd("sales_representative", v)} />
+            <Field label="Team manager" v={form.team_manager} onChange={(v) => upd("team_manager", v)} />
+            <Field label="Booking place" v={form.booking_place} onChange={(v) => upd("booking_place", v)} />
+            <Field label="Booking date" v={form.booking_date} onChange={(v) => upd("booking_date", v)} type="date" />
             <Field label="Project / property name *" v={form.project_name} onChange={(v) => upd("project_name", v)} />
             <Field label="Unit / flat number *" v={form.unit_number} onChange={(v) => upd("unit_number", v)} />
+            <Field label="Block" v={form.block} onChange={(v) => upd("block", v)} />
+            <Field label="Facing" v={form.facing} onChange={(v) => upd("facing", v)} />
             <TextArea label="Property details" v={form.property_details} onChange={(v) => upd("property_details", v)} rows={3} full />
+          </Grid>
+        </Section>
+
+        <Section title="Sale consideration & areas">
+          <Grid>
+            {(["saleable_area", "carpet_area", "external_walls_area", "balcony_utility_area", "common_area"] as const).map((key) => <Field key={key} label={key.replaceAll("_", " ")} v={form[key]} onChange={(v) => upd(key, v)} type="number" min={0} step={0.01} />)}
+            {(["base_price", "floor_rise_charges", "east_facing_charges", "premium_view_charges", "amenities_charges", "car_parking_charges", "legal_documentation_charges", "sale_consideration_per_sqft"] as const).map((key) => <Field key={key} label={key.replaceAll("_", " ") + " (₹)"} v={form[key]} onChange={(v) => upd(key, v)} type="number" min={0} step={0.01} />)}
+          </Grid>
+        </Section>
+
+        <Section title="Source & purchase details">
+          <Grid>
+            <Field label="Source of booking" v={form.source_of_booking} onChange={(v) => upd("source_of_booking", v)} />
+            <Field label="Payment source" v={form.payment_source} onChange={(v) => upd("payment_source", v)} />
+            <Field label="Purpose of purchase" v={form.purchase_purpose} onChange={(v) => upd("purchase_purpose", v)} />
+            <Field label="Referral customer name" v={form.referral_customer_name} onChange={(v) => upd("referral_customer_name", v)} />
+            <Field label="Referral project name" v={form.referral_project_name} onChange={(v) => upd("referral_project_name", v)} />
+            <Field label="CP agent / organization" v={form.cp_agent_name} onChange={(v) => upd("cp_agent_name", v)} />
+            <Field label="CP RERA ID" v={form.cp_rera_id} onChange={(v) => upd("cp_rera_id", v)} />
           </Grid>
         </Section>
 
@@ -155,7 +213,7 @@ export default function NewBookingForm({ role }: { role: string }) {
         </Section>
       </div>
 
-      <aside className="space-y-4">
+      <aside className="space-y-4 self-start lg:sticky lg:top-24">
         <div className="card p-5 sticky top-24">
           <h3 className="text-sm font-semibold text-slate-900">Live summary</h3>
           <div className="mt-4 space-y-3 text-sm">

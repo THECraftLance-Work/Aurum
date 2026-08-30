@@ -12,11 +12,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage({
   searchParams
-}: { searchParams: { range?: string } }) {
+}: { searchParams: Promise<{ range?: string }> }) {
+  const filters = await searchParams;
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
 
-  const rangeKey = isRangeKey(searchParams.range) ? searchParams.range : DEFAULT_RANGE;
+  const rangeKey = isRangeKey(filters.range) ? filters.range : DEFAULT_RANGE;
   const { since, label } = resolveRange(rangeKey);
 
   const own = ["SM", "CP"].includes(user.role);
@@ -75,7 +76,9 @@ export default async function AnalyticsPage({
         </div>
       </div>
 
-      <AnalyticsCharts bookings={rows} payments={payments ?? []} />
+      <div className="max-h-[calc(100vh-180px)] overflow-y-auto overscroll-contain pr-1">
+        <AnalyticsCharts bookings={rows} payments={payments ?? []} />
+      </div>
     </>
   );
 }

@@ -3,8 +3,9 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendNotification, writeAudit } from "@/lib/utils/notifications";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServer();
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -18,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (decision === "REJECTED" && !reason) return NextResponse.json({ error: "Reason required" }, { status: 400 });
 
   const admin = createSupabaseAdmin();
-  const { data: bk } = await admin.from("bookings").select("id, booking_id, created_by, status").eq("id", params.id).maybeSingle();
+  const { data: bk } = await admin.from("bookings").select("id, booking_id, created_by, status").eq("id", id).maybeSingle();
   if (!bk) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await admin.from("bookings").update({

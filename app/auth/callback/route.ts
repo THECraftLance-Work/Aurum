@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get("code");
   if (!code) return NextResponse.redirect(new URL("/login", request.url));
 
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   await supabase.auth.exchangeCodeForSession(code);
 
   const { data: { user } } = await supabase.auth.getUser();

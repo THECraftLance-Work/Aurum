@@ -5,7 +5,7 @@ import { roleLabels } from "@/lib/utils/format";
 import { formatDateTime } from "@/lib/utils/format";
 
 export default async function PendingPage() {
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
@@ -67,4 +67,3 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
-

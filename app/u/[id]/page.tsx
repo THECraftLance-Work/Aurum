@@ -10,8 +10,9 @@ export const revalidate = 0;
 export default async function PublicUserDetail({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   // ACCESS CONTROL — this must stay above every query.
   //
   // The page reads with the service-role client, which bypasses RLS entirely,
@@ -30,7 +31,7 @@ export default async function PublicUserDetail({
     .select(
       "id, name, email, phone, role, status, auth_provider, employee_id, requested_role, avatar_url, approved_at, last_login_at, created_at"
     )
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (userErr || !u) notFound();

@@ -13,8 +13,8 @@ import { cookies } from "next/headers";
  * that only needs the admin client (the outbound worker, notification helpers)
  * doesn't pull in `next/headers` and can be reused outside Next.js.
  */
-export const createSupabaseServer = cache(() => {
-  const cookieStore = cookies();
+export const createSupabaseServer = cache(async () => {
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

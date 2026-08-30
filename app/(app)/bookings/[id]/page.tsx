@@ -8,20 +8,21 @@ import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
 import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
-import AttachmentList from "@/components/bookings/AttachmentList";
+import AddBookingCustomer from "@/components/bookings/AddBookingCustomer";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import ClickableRow from "@/components/ui/ClickableRow";
 
 export const dynamic = "force-dynamic";
 
-export default async function BookingDetail({ params }: { params: { id: string } }) {
+export default async function BookingDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
 
   const { data: b } = await supabase
     .from("bookings")
-    .select("id, booking_id, project_name, unit_number, property_details, total_property_value, total_amount_paid, remaining_balance, status, submitted_at, updated_at, rejection_reason, bank_name, bank_account_holder, bank_account_number, bank_ifsc, bank_branch, loan_sanctioned, loan_amount, created_by, customer:customer_id(name, phone, email)")
-    .eq("id", params.id)
+    .select("*, customer:customer_id(name, phone, email)")
+    .eq("id", id)
     .maybeSingle();
   if (!b) notFound();
 
@@ -33,7 +34,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
 
   // These two have no dependency on each other, so run them together rather
   // than paying two sequential round-trips.
-  const [{ data: payments }, { data: history }, { data: attachments }] = await Promise.all([
+  const [{ data: payments }, { data: history }, { data: bookingCustomers }] = await Promise.all([
     supabase
       .from("payments")
       .select("id, amount, payment_date, payment_mode, status, reference_no, submitted_by, reviewed_by")
@@ -48,11 +49,11 @@ export default async function BookingDetail({ params }: { params: { id: string }
       .order("created_at", { ascending: false })
       .limit(50),
     supabase
-      .from("attachments")
-      .select("id, file_name, file_size, mime_type, storage_path, label, created_at, uploader:uploaded_by(name)")
-      .eq("entity_type", "booking")
-      .eq("entity_id", b.id)
-      .order("created_at", { ascending: false })
+      .from("booking_customers")
+      .select("id, is_primary, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, aadhaar_number, occupation, organization, designation)")
+      .eq("booking_id", b.id)
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: true })
   ]);
 
   // One batched lookup for every user id referenced on this page.
@@ -64,6 +65,10 @@ export default async function BookingDetail({ params }: { params: { id: string }
 
   const canReview = ["ACCOUNTANT","ADMIN","DIRECTOR"].includes(user.role) && ["SUBMITTED","UNDER_REVIEW","UPDATED"].includes(b.status);
   const canAddPayment = ["SM","CP","ADMIN","DIRECTOR"].includes(user.role);
+  const people = (bookingCustomers ?? []).map((row: any) => ({
+    ...row,
+    customer: Array.isArray(row.customer) ? row.customer[0] ?? null : row.customer ?? null
+  }));
 
   return (
     <>
@@ -78,14 +83,45 @@ export default async function BookingDetail({ params }: { params: { id: string }
         }
       />
 
+      <div className="max-h-[calc(100vh-130px)] overflow-y-auto overscroll-contain pr-1">
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <div className="card p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Customer</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900">Customers</h3>
+              {canAddPayment && <AddBookingCustomer bookingId={b.id} />}
+            </div>
+            <div className="space-y-3">
+              {(people.length ? people : [{ id: "primary", is_primary: true, customer }]).map((person: any, index: number) => (
+                <div key={person.id} className="rounded-xl border border-border p-4">
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{person.is_primary || index === 0 ? "Primary customer" : `Additional customer ${index + 1}`}</div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <Info label="Name" value={person.customer?.name ?? "—"} />
+                    <Info label="Title / relation" value={[person.customer?.title, person.customer?.father_spouse_name].filter(Boolean).join(" · ") || "—"} />
+                    <Info label="Phone" value={person.customer?.phone ?? "—"} />
+                    <Info label="Email" value={person.customer?.email ?? "—"} />
+                    <Info label="Date of birth" value={person.customer?.date_of_birth ?? "—"} />
+                    <Info label="Alternate contact" value={[person.customer?.alternate_phone, person.customer?.alternate_email].filter(Boolean).join(" · ") || "—"} />
+                    <Info label="Address" value={[person.customer?.address, person.customer?.city, person.customer?.state, person.customer?.pin_code].filter(Boolean).join(", ") || "—"} span />
+                    <Info label="PAN / Aadhaar" value={[person.customer?.pan_number, person.customer?.aadhaar_number].filter(Boolean).join(" · ") || "—"} />
+                    <Info label="Occupation" value={[person.customer?.occupation, person.customer?.organization, person.customer?.designation].filter(Boolean).join(" · ") || "—"} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="mb-4 text-sm font-semibold text-slate-900">Booking form details</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <Info label="Name"  value={customer?.name ?? "—"} />
-              <Info label="Phone" value={customer?.phone ?? "—"} />
-              <Info label="Email" value={customer?.email ?? "—"} />
+              <Info label="Sales representative" value={b.sales_representative ?? "—"} /><Info label="Team manager" value={b.team_manager ?? "—"} />
+              <Info label="Booking place" value={b.booking_place ?? "—"} /><Info label="Booking date" value={b.booking_date ?? "—"} />
+              <Info label="Block" value={b.block ?? "—"} /><Info label="Facing" value={b.facing ?? "—"} />
+              <Info label="Saleable area" value={b.saleable_area ? `${b.saleable_area} Sq.ft` : "—"} /><Info label="Carpet area" value={b.carpet_area ? `${b.carpet_area} Sq.ft` : "—"} />
+              <Info label="External walls area" value={b.external_walls_area ? `${b.external_walls_area} Sq.ft` : "—"} /><Info label="Balcony & utility area" value={b.balcony_utility_area ? `${b.balcony_utility_area} Sq.ft` : "—"} />
+              <Info label="Common area" value={b.common_area ? `${b.common_area} Sq.ft` : "—"} /><Info label="Sale consideration / Sq.ft" value={b.sale_consideration_per_sqft ? formatINR(b.sale_consideration_per_sqft) : "—"} />
+              <Info label="Source of booking" value={b.source_of_booking ?? "—"} /><Info label="Payment source" value={b.payment_source ?? "—"} />
+              <Info label="Purpose of purchase" value={b.purchase_purpose ?? "—"} /><Info label="CP / referral" value={[b.cp_agent_name, b.cp_rera_id].filter(Boolean).join(" · ") || "—"} />
             </div>
           </div>
 
@@ -116,18 +152,6 @@ export default async function BookingDetail({ params }: { params: { id: string }
               </div>
             </div>
           )}
-
-          <div className="card p-5">
-            <h3 className="mb-4 text-sm font-semibold text-slate-900">Documents</h3>
-            {/* PostgREST types an embedded to-one relation as an array, so
-                flatten `uploader` to the single row it actually is. */}
-            <AttachmentList
-              attachments={(attachments ?? []).map((a: any) => ({
-                ...a,
-                uploader: Array.isArray(a.uploader) ? a.uploader[0] ?? null : a.uploader ?? null
-              }))}
-            />
-          </div>
 
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Financial</h3>
@@ -226,7 +250,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
           </div>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 self-start lg:sticky lg:top-24">
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900">Submission</h3>
             <dl className="mt-3 space-y-2 text-sm">
@@ -251,6 +275,7 @@ export default async function BookingDetail({ params }: { params: { id: string }
             </div>
           )}
         </aside>
+      </div>
       </div>
     </>
   );

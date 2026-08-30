@@ -25,13 +25,14 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!params.id) {
+  const { id } = await params;
+  if (!id) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -47,7 +48,7 @@ export async function GET(
   const { data: att, error } = await admin
     .from("attachments")
     .select("id, entity_type, entity_id, storage_path, file_name, mime_type, uploaded_by")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (error || !att) {
