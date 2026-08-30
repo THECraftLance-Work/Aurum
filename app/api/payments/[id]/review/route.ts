@@ -117,6 +117,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     reason: reason ?? undefined
   });
 
+  // Cancel the held "payment recorded, pending verification" note if it has not
+  // gone out yet. Without this the customer gets that mail and the outcome mail
+  // within a minute of each other, which reads as duplicate spam.
+  const { data: cancelled } = await admin
+    .from("notification_deliveries")
+    .update({
+      status: "SKIPPED",
+      provider: "none",
+      error_code: "SUPERSEDED",
+      error_message: "Payment was verified before the pending note was due",
+      updated_at: now
+    })
+    .eq("entity_id", pay.id)
+    .eq("event_key", "PAYMENT_ADDED_CUSTOMER")
+    .in("status", ["QUEUED", "FAILED"])
+    .select("id");
+  if (cancelled?.length) {
+    console.info(`[payments] superseded ${cancelled.length} pending-note email(s) for ${pay.id}`);
+  }
+
   // Email the customer. They have no account, so this is their only channel —
   // and until now they heard nothing after the booking-created email, so a
   // verified or rejected payment was invisible to them.

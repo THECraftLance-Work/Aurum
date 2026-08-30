@@ -1,5 +1,12 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { kickDeliveryWorker } from "./kick";
+
+/**
+ * How long the customer "pending verification" note waits before sending, so a
+ * fast approval can supersede it. Ten minutes: long enough to absorb a prompt
+ * review, short enough that a real backlog still gets acknowledged.
+ */
+const PENDING_NOTE_HOLD_MS = 10 * 60 * 1000;
 import { resolveRecipients } from "./recipients";
 import { whatsappEnv } from "./env";
 import { isEmail } from "./phone";
@@ -37,7 +44,7 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         event_key: event.key, channel: "EMAIL", recipient: to,
         entity_type: "booking", entity_id: event.entityId,
         subject: mail.subject,
-        payload: { html: mail.html, text: mail.text },
+        payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}` },
         dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
       });
     }
@@ -95,6 +102,20 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         : buildPaymentReceivedCustomerEmail(d);
       // The decision is part of the key so approve-after-reject still sends.
       const suffix = event.key === "PAYMENT_REVIEWED" ? `:${d.decision}` : "";
+
+      /**
+       * Hold the "payment recorded, pending verification" note briefly.
+       *
+       * Accountants often approve within a minute, and the customer was then
+       * getting two emails about one payment back to back — the first already
+       * obsolete. Delaying it means a quick approval produces exactly one
+       * email (the outcome), while a genuinely slow one still gets its
+       * acknowledgement. The review route cancels this row if it wins the race.
+       *
+       * The verification outcome always goes out immediately.
+       */
+      const holdMs = event.key === "PAYMENT_ADDED" ? PENDING_NOTE_HOLD_MS : 0;
+
       rows.push({
         event_key: `${event.key}_CUSTOMER`,
         channel: "EMAIL",
@@ -102,7 +123,8 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         entity_type: "payment",
         entity_id: event.entityId,
         subject: mail.subject,
-        payload: { html: mail.html, text: mail.text },
+        payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}` },
+        next_attempt_at: new Date(Date.now() + holdMs).toISOString(),
         dedupe_key: `${event.key}_CUSTOMER:${event.entityId}${suffix}:EMAIL:${d.customerEmail}`
       });
     }

@@ -24,6 +24,8 @@ export type DeliveryRow = {
     // WHATSAPP
     bodyParams?: string[];
     urlButtonParam?: string;
+    /** Stable per-booking key used to thread emails in the client. */
+    threadKey?: string;
   } | null;
   attempts: number;
   max_attempts: number;
