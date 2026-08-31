@@ -15,8 +15,15 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 export default async function BookingsPage({
-  searchParams
-}: { searchParams: Promise<{ status?: string; q?: string; customer?: string; page?: string }> }) {
+  searchParams,
+}: {
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    customer?: string;
+    page?: string;
+  }>;
+}) {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
   const filters = await searchParams;
@@ -28,7 +35,7 @@ export default async function BookingsPage({
     .from("bookings")
     .select(
       "id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, remaining_balance, status, created_at, customer:customer_id(name, phone)",
-      { count: "exact" }
+      { count: "exact" },
     )
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
@@ -41,7 +48,9 @@ export default async function BookingsPage({
     // %, comma, parentheses, dot and backslash. Without this a query like
     // "A-1)" produces a malformed filter and a 400.
     const term = `%${filters.q.replace(/[%,()\.]/g, " ").trim()}%`;
-    query = query.or(`booking_id.ilike.${term},project_name.ilike.${term},unit_number.ilike.${term}`);
+    query = query.or(
+      `booking_id.ilike.${term},project_name.ilike.${term},unit_number.ilike.${term}`,
+    );
   }
 
   const { data: bookings, count } = await query;
@@ -76,8 +85,11 @@ export default async function BookingsPage({
       {/* min-w-0 lets this shrink inside the flex column, so the inner
           overflow-x-auto actually scrolls instead of pushing the page wide. */}
       <div className="card min-w-0 overflow-hidden p-0">
-        {(!bookings || bookings.length === 0) ? (
-          <EmptyState title="No bookings found" description="Try adjusting filters or create a new booking." />
+        {!bookings || bookings.length === 0 ? (
+          <EmptyState
+            title="No bookings found"
+            description="Try adjusting filters or create a new booking."
+          />
         ) : (
           <>
             {/* Desktop: fixed-layout table so a long unbroken string truncates
@@ -101,38 +113,68 @@ export default async function BookingsPage({
                     <th className="px-5 py-3 font-medium">Project · Unit</th>
                     <th className="px-5 py-3 text-right font-medium">Value</th>
                     <th className="px-5 py-3 text-right font-medium">Paid</th>
-                    <th className="px-5 py-3 text-right font-medium">Pending</th>
+                    <th className="px-5 py-3 text-right font-medium">
+                      Pending
+                    </th>
                     <th className="px-5 py-3 font-medium">Status</th>
                     <th className="px-5 py-3 font-medium">Created</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bookings.map((b: any) => (
-                    <ClickableRow key={b.id} href={`/bookings/${b.id}`} className="row-hover border-t border-border">
+                    <ClickableRow
+                      key={b.id}
+                      href={`/bookings/${b.id}`}
+                      className="row-hover border-t border-border"
+                    >
                       <td className="px-5 py-3">
-                        <Link href={`/bookings/${b.id}`} className="cell-truncate font-medium text-slate-900 hover:text-accent">
+                        <Link
+                          href={`/bookings/${b.id}`}
+                          className="cell-truncate font-medium text-slate-900 hover:text-accent"
+                        >
                           {b.booking_id}
                         </Link>
                       </td>
                       <td className="px-5 py-3">
                         <Tooltip className="block" label={b.customer?.name}>
-                          <span className="cell-truncate text-slate-900">{b.customer?.name ?? "—"}</span>
+                          <span className="cell-truncate text-slate-900">
+                            {b.customer?.name ?? "—"}
+                          </span>
                         </Tooltip>
-                        <span className="cell-truncate text-xs text-slate-500">{b.customer?.phone ?? ""}</span>
+                        <span className="cell-truncate text-xs text-slate-500">
+                          {b.customer?.phone ?? ""}
+                        </span>
                       </td>
                       <td className="px-5 py-3">
                         <Tooltip className="block" label={b.project_name}>
-                          <span className="cell-truncate text-slate-900">{b.project_name}</span>
+                          <span className="cell-truncate text-slate-900">
+                            {b.project_name}
+                          </span>
                         </Tooltip>
-                        <Tooltip className="block" label={`Unit ${b.unit_number}`}>
-                          <span className="cell-truncate text-xs text-slate-500">Unit {b.unit_number}</span>
+                        <Tooltip
+                          className="block"
+                          label={`Unit ${b.unit_number}`}
+                        >
+                          <span className="cell-truncate text-xs text-slate-500">
+                            Unit {b.unit_number}
+                          </span>
                         </Tooltip>
                       </td>
-                      <td className="px-5 py-3 text-right tabular-nums">{formatINR(b.total_property_value)}</td>
-                      <td className="px-5 py-3 text-right tabular-nums text-emerald-700">{formatINR(b.total_amount_paid)}</td>
-                      <td className="px-5 py-3 text-right tabular-nums text-amber-700">{formatINR(b.remaining_balance)}</td>
-                      <td className="px-5 py-3"><StatusBadge status={b.status} /></td>
-                      <td className="px-5 py-3 text-slate-500">{formatDate(b.created_at)}</td>
+                      <td className="px-5 py-3 text-right tabular-nums">
+                        {formatINR(b.total_property_value)}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums text-emerald-700">
+                        {formatINR(b.total_amount_paid)}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums text-amber-700">
+                        {formatINR(b.remaining_balance)}
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusBadge status={b.status} />
+                      </td>
+                      <td className="px-5 py-3 text-slate-500">
+                        {formatDate(b.created_at)}
+                      </td>
                     </ClickableRow>
                   ))}
                 </tbody>
@@ -144,17 +186,39 @@ export default async function BookingsPage({
               {bookings.map((b: any) => (
                 <li key={b.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <Link href={`/bookings/${b.id}`} className="min-w-0 font-medium text-slate-900">
+                    <Link
+                      href={`/bookings/${b.id}`}
+                      className="min-w-0 font-medium text-slate-900"
+                    >
                       <span className="block truncate">{b.booking_id}</span>
-                      <span className="block truncate text-xs font-normal text-slate-500">{b.customer?.name ?? "—"}</span>
+                      <span className="block truncate text-xs font-normal text-slate-500">
+                        {b.customer?.name ?? "—"}
+                      </span>
                     </Link>
                     <StatusBadge status={b.status} />
                   </div>
-                  <div className="mt-2 truncate text-sm text-slate-600">{b.project_name} · Unit {b.unit_number}</div>
+                  <div className="mt-2 truncate text-sm text-slate-600">
+                    {b.project_name} · Unit {b.unit_number}
+                  </div>
                   <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div><dt className="text-slate-500">Value</dt><dd className="tabular-nums font-medium">{formatINR(b.total_property_value)}</dd></div>
-                    <div><dt className="text-slate-500">Paid</dt><dd className="tabular-nums font-medium text-emerald-700">{formatINR(b.total_amount_paid)}</dd></div>
-                    <div><dt className="text-slate-500">Pending</dt><dd className="tabular-nums font-medium text-amber-700">{formatINR(b.remaining_balance)}</dd></div>
+                    <div>
+                      <dt className="text-slate-500">Value</dt>
+                      <dd className="tabular-nums font-medium">
+                        {formatINR(b.total_property_value)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Paid</dt>
+                      <dd className="tabular-nums font-medium text-emerald-700">
+                        {formatINR(b.total_amount_paid)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Pending</dt>
+                      <dd className="tabular-nums font-medium text-amber-700">
+                        {formatINR(b.remaining_balance)}
+                      </dd>
+                    </div>
                   </dl>
                 </li>
               ))}
@@ -166,8 +230,22 @@ export default async function BookingsPage({
                   {from + 1}–{Math.min(from + PAGE_SIZE, total)} of {total}
                 </span>
                 <div className="flex gap-2">
-                  {page > 1 && <Link href={pageHref(page - 1)} className="btn-secondary h-8 text-xs">Previous</Link>}
-                  {page < totalPages && <Link href={pageHref(page + 1)} className="btn-secondary h-8 text-xs">Next</Link>}
+                  {page > 1 && (
+                    <Link
+                      href={pageHref(page - 1)}
+                      className="btn-secondary h-8 text-xs"
+                    >
+                      Previous
+                    </Link>
+                  )}
+                  {page < totalPages && (
+                    <Link
+                      href={pageHref(page + 1)}
+                      className="btn-secondary h-8 text-xs"
+                    >
+                      Next
+                    </Link>
+                  )}
                 </div>
               </div>
             )}

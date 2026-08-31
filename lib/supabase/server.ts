@@ -2,6 +2,11 @@ import { cache } from "react";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+// Keep the persistent session across normal day-to-day visits. Supabase still
+// refreshes the short-lived access token; this only controls the browser cookie
+// lifetime and does not create an unlimited session.
+const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
 /**
  * Request-scoped Supabase client bound to the caller's cookies.
  *
@@ -19,6 +24,7 @@ export const createSupabaseServer = cache(async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { maxAge: SESSION_COOKIE_MAX_AGE },
       cookies: {
         get(name: string) { return cookieStore.get(name)?.value; },
         set(name: string, value: string, options: CookieOptions) {
