@@ -46,6 +46,7 @@ export async function POST(req: Request) {
   if (!bookingResult.success) return NextResponse.json({ error: validationMessage(bookingResult) }, { status: 400 });
 
   const admin = createSupabaseAdmin();
+  const createdBy = profile.id;
 
   function customerInsert(person: any) {
     return {
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
       occupation: person.occupation?.trim() || null,
       organization: person.organization?.trim() || null,
       designation: person.designation?.trim() || null,
-      created_by: profile.id,
+      created_by: createdBy,
     };
   }
 
