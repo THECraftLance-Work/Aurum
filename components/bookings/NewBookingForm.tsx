@@ -1,8 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/utils/format";
 import FileUpload, { type UploadedFile } from "@/components/ui/FileUpload";
+import { bookingSchema, customerSchema, validationMessage } from "@/lib/validation/booking";
 
 const PAYMENT_MODES = [
   "BANK_TRANSFER",
@@ -40,6 +41,8 @@ export default function NewBookingForm({ role }: { role: string }) {
     designation: "",
   };
   const [customers, setCustomers] = useState([emptyCustomer]);
+  const [saveData, setSaveData] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
   const [form, setForm] = useState({
     project_name: "",
     unit_number: "",
@@ -86,6 +89,33 @@ export default function NewBookingForm({ role }: { role: string }) {
     purchase_purpose: "",
   });
 
+  const draftKey = "new-booking-draft";
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) || "null");
+      if (saved?.form) setForm((current) => ({ ...current, ...saved.form }));
+      if (Array.isArray(saved?.customers) && saved.customers.length) setCustomers(saved.customers);
+      setSaveData(localStorage.getItem("new-booking-save-data") === "on");
+    } catch { /* Browser storage is optional. */ }
+    setDraftReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady || !saveData) return;
+    const timer = window.setTimeout(() => {
+      try { localStorage.setItem(draftKey, JSON.stringify({ form, customers })); } catch { /* Browser storage is optional. */ }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [form, customers, saveData, draftReady]);
+
+  function toggleSaveData(next: boolean) {
+    setSaveData(next);
+    try {
+      localStorage.setItem("new-booking-save-data", next ? "on" : "off");
+      if (!next) localStorage.removeItem(draftKey);
+    } catch { /* Browser storage is optional. */ }
+  }
+
   function upd<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
   }
@@ -110,26 +140,17 @@ export default function NewBookingForm({ role }: { role: string }) {
     form.bank_ifsc.trim().length > 0 &&
     !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bank_ifsc.trim());
 
-  const valid = useMemo(() => {
-    const relationComplete = customers.every(
-      (customer) =>
-        !customer.relation_type || customer.father_spouse_name.trim(),
-    );
-    return (
-      Boolean(
-        customers[0]?.name.trim() &&
-        form.project_name &&
-        form.unit_number &&
-        relationComplete,
-      ) &&
-      total > 0 &&
-      totalPaid <= total &&
-      !ifscInvalid
-    );
-  }, [customers, form, total, totalPaid, ifscInvalid]);
+  const validation = useMemo(() => {
+    const customerResult = customers.map((customer) => customerSchema.safeParse(customer)).find((result) => !result.success);
+    if (customerResult && !customerResult.success) return { valid: false, message: validationMessage(customerResult) };
+    const result = bookingSchema.safeParse(form);
+    return result.success ? { valid: true, message: null } : { valid: false, message: validationMessage(result) };
+  }, [customers, form]);
+  const valid = validation.valid;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validation.valid) { setError(validation.message); return; }
     setBusy(true);
     setError(null);
     const res = await fetch("/api/bookings", {
@@ -218,6 +239,7 @@ export default function NewBookingForm({ role }: { role: string }) {
       return setError(j.error ?? "Failed to create booking.");
     }
     const { id } = await res.json();
+    try { localStorage.removeItem(draftKey); } catch { /* Browser storage is optional. */ }
     router.push(`/bookings/${id}`);
     router.refresh();
   }
@@ -227,6 +249,14 @@ export default function NewBookingForm({ role }: { role: string }) {
       onSubmit={submit}
       className="max-h-[calc(95vh-130px)] overflow-y-auto overscroll-contain pr-1 grid gap-4 xl:grid-cols-3"
     >
+      <div className="sticky top-0 z-20 -mb-1 flex justify-end bg-slate-50/95 py-2 backdrop-blur-sm xl:col-span-3">
+        <label className="flex items-center gap-3 rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+          <span>Save data while filling</span>
+          <button type="button" role="switch" aria-checked={saveData} aria-label="Save data while filling" onClick={() => toggleSaveData(!saveData)} className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${saveData ? "bg-emerald-600" : "bg-slate-300"}`}>
+            <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${saveData ? "translate-x-5" : "translate-x-0"}`} />
+          </button>
+        </label>
+      </div>
       <div className="xl:col-span-2 space-y-4">
         <Section title="Customer details">
           <div className="space-y-4">
@@ -340,11 +370,18 @@ export default function NewBookingForm({ role }: { role: string }) {
                     onChange={(v) =>
                       updCustomer(index, "pan_number", v.toUpperCase())
                     }
+                    pattern="[A-Z]{5}[0-9]{4}[A-Z]"
+                    maxLength={10}
                   />
                   <Field
                     label="Aadhaar number"
                     v={customer.aadhaar_number}
-                    onChange={(v) => updCustomer(index, "aadhaar_number", v)}
+                    onChange={(v) =>
+                      updCustomer(index, "aadhaar_number", v.replace(/\D/g, "").slice(0, 12))
+                    }
+                    inputMode="numeric"
+                    pattern="[2-9][0-9]{11}"
+                    maxLength={12}
                   />
                   <Field
                     label="Occupation"
@@ -705,6 +742,9 @@ function Field(props: {
   min?: number;
   step?: number;
   required?: boolean;
+  pattern?: string;
+  maxLength?: number;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <div>
@@ -717,6 +757,9 @@ function Field(props: {
         min={props.min}
         step={props.step}
         required={props.required}
+        pattern={props.pattern}
+        maxLength={props.maxLength}
+        inputMode={props.inputMode}
       />
     </div>
   );

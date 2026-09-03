@@ -3,6 +3,7 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { notifyRole, writeAudit } from "@/lib/utils/notifications";
 import { dispatchOutbound } from "@/lib/integrations/outbound";
+import { bookingSchema, customerSchema, validationMessage } from "@/lib/validation/booking";
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer();
@@ -18,20 +19,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Role not permitted." }, { status: 403 });
   }
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   const { customer, customers, booking, initialPayment, previousPayments, attachment } = body ?? {};
 
   const customerList = Array.isArray(customers) && customers.length ? customers : [customer];
-
-  if (!customerList[0]?.name || !booking?.project_name || !booking?.unit_number || !booking?.total_property_value) {
-    return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+  if (!booking || typeof booking !== "object") {
+    return NextResponse.json({ error: "Booking details are required." }, { status: 400 });
   }
+
+  const customerResults = customerList.map((person: unknown) => customerSchema.safeParse(person));
+  const invalidCustomer = customerResults.find((result) => !result.success);
+  if (invalidCustomer && !invalidCustomer.success) return NextResponse.json({ error: validationMessage(invalidCustomer) }, { status: 400 });
   const totalValue = Number(booking.total_property_value);
   const previous = Number(previousPayments ?? 0);
   const current = Number(initialPayment?.amount ?? 0);
-  if (previous + current > totalValue) {
-    return NextResponse.json({ error: "Payments exceed total property value." }, { status: 400 });
-  }
+  const bookingResult = bookingSchema.safeParse({
+    ...booking,
+    previous_payments: previous,
+    current_payment: current,
+    payment_date: initialPayment?.payment_date ?? new Date().toISOString().slice(0, 10),
+    payment_mode: initialPayment?.payment_mode ?? "OTHER",
+    reference_no: initialPayment?.reference_no ?? "",
+    loan_sanctioned: booking.loan_sanctioned ? "yes" : "no",
+  });
+  if (!bookingResult.success) return NextResponse.json({ error: validationMessage(bookingResult) }, { status: 400 });
 
   const admin = createSupabaseAdmin();
 
