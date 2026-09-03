@@ -54,14 +54,16 @@ export default async function AnalyticsPage({
   const collectionRate = totalValue > 0 ? Math.round((totalReceived / totalValue) * 100) : 0;
 
   return (
-    <>
-      <PageHeader
-        title="Analytics"
-        description={`Business performance and workflow metrics · ${label}`}
-        actions={<DateRangeFilter current={rangeKey} />}
-      />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0">
+        <PageHeader
+          title="Analytics"
+          description={`Business performance and workflow metrics · ${label}`}
+          actions={<DateRangeFilter current={rangeKey} />}
+        />
+      </div>
 
-      <div className="stagger-children mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="stagger-children mb-6 grid shrink-0 grid-cols-2 gap-4 xl:grid-cols-4">
         <div style={{ ["--stagger" as any]: 0 }}>
           <StatCard label="Total bookings" value={totalBookings} tone="blue" icon={<ClipboardList className="h-4 w-4" />} />
         </div>
@@ -76,9 +78,9 @@ export default async function AnalyticsPage({
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-180px)] overflow-y-auto overscroll-contain pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
         <AnalyticsCharts bookings={rows} payments={payments ?? []} />
       </div>
-    </>
+    </div>
   );
 }

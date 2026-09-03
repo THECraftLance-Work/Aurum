@@ -136,7 +136,7 @@ export default function ChartsInner({ bookings, payments }: { bookings: any[]; p
   }
 
   return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-2">
       <Panel title="Collection over time" subtitle="Approved payments received per month" delay={0}>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
