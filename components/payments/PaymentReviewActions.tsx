@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, X, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatINR } from "@/lib/utils/format";
 
@@ -87,7 +87,7 @@ export default function PaymentReviewActions({
             disabled={busy || reason.trim().length < 3}
             className="btn-danger h-9 flex-1"
           >
-            {busy ? "Rejecting…" : "Confirm reject"}
+            {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Rejecting…</> : "Confirm reject"}
           </button>
         </div>
       </div>
@@ -103,7 +103,7 @@ export default function PaymentReviewActions({
         disabled={busy}
         className={`btn-success flex-1 ${h}`}
       >
-        <Check className="h-3.5 w-3.5" /> Approve
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} {busy ? "Approving…" : "Approve"}
       </button>
       <button
         onClick={() => setMode("rejecting")}

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -108,7 +108,7 @@ export default function ConfirmDialog({
             disabled={busy}
             className={cn("h-9", tone === "danger" ? "btn-danger" : "btn-primary")}
           >
-            {busy ? "Working…" : confirmLabel}
+            {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : confirmLabel}
           </button>
         </div>
       </div>

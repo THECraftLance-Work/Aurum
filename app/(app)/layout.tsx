@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell user={user} pendingVerification={pendingVerification}>
+      <AppShell user={user} pendingVerification={pendingVerification}>
       {children}
     </AppShell>
   );

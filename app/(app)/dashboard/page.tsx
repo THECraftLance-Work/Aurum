@@ -120,7 +120,7 @@ export default async function DashboardPage() {
       {/* items-start: each card sizes to its own content. Without it the grid
           stretches every item to the tallest in the row, so a long Payment
           activity list left a large void under Recent bookings. */}
-      <section className="dashboard-section mt-6 grid min-w-0 items-start gap-4 xl:grid-cols-3">
+      <section className="dashboard-section mt-6 grid min-w-0 items-start gap-4 sm:pb-0 mb:pb-14 xl:grid-cols-3 xl:pb-0">
         <div className="card min-w-0 overflow-hidden p-0 xl:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Recent bookings</h3>
@@ -135,16 +135,16 @@ export default async function DashboardPage() {
                   <col className="w-[130px]" />
                   <col />
                   <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[130px]" />
+                  <col className="hidden w-[120px] sm:table-column" />
+                  <col className="hidden w-[130px] sm:table-column" />
                 </colgroup>
-                <thead className="bg-slate-50 text-left text-slate-500">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                   <tr>
                     <th className="px-5 py-3 font-medium">Booking</th>
                     <th className="px-5 py-3 font-medium">Project</th>
                     <th className="px-5 py-3 text-right font-medium">Value</th>
-                    <th className="px-5 py-3 text-right font-medium">Paid</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="hidden px-5 py-3 text-right font-medium sm:table-cell">Paid</th>
+                    <th className="hidden px-5 py-3 font-medium sm:table-cell">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -163,8 +163,8 @@ export default async function DashboardPage() {
                         </Tooltip>
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums">{formatINR(b.total_property_value)}</td>
-                      <td className="px-5 py-3 text-right tabular-nums">{formatINR(b.total_amount_paid)}</td>
-                      <td className="px-5 py-3"><StatusBadge status={b.status} /></td>
+                      <td className="hidden px-5 py-3 text-right tabular-nums sm:table-cell">{formatINR(b.total_amount_paid)}</td>
+                      <td className="hidden px-5 py-3 sm:table-cell"><StatusBadge status={b.status} /></td>
                     </tr>
                   ))}
                 </tbody>

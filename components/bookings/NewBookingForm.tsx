@@ -247,7 +247,7 @@ export default function NewBookingForm({ role }: { role: string }) {
   return (
     <form
       onSubmit={submit}
-      className="max-h-[calc(95vh-130px)] overflow-y-auto overscroll-contain pr-1 grid gap-4 xl:grid-cols-3"
+      className="max-h-[calc(95vh-130px)] overflow-y-auto overscroll-contain pb-24 pr-1 grid gap-4 xl:grid-cols-3"
     >
       <div className="sticky top-0 z-20 -mb-1 flex justify-end bg-slate-50/95 py-2 backdrop-blur-sm xl:col-span-3">
         <label className="flex items-center gap-3 rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">

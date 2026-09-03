@@ -61,7 +61,10 @@ export default function FileUpload({
 
     setUploading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // The browser session is already persisted locally. Avoid an extra
+      // auth-network round trip before starting the Storage upload.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) { setError("You appear to be signed out. Reload and try again."); return; }
 
       // Storage RLS requires the first path segment to be the uploader's id.
@@ -70,7 +73,11 @@ export default function FileUpload({
 
       const { error: upErr } = await supabase.storage
         .from("documents")
-        .upload(storagePath, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        .upload(storagePath, file, {
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600",
+          upsert: false,
+        });
 
       if (upErr) {
         setError(upErr.message.includes("Bucket not found")

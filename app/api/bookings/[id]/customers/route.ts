@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     title: body.title ?? null, name, father_spouse_name: body.father_spouse_name ?? null, date_of_birth: body.date_of_birth || null,
     address: body.address ?? null, city: body.city ?? null, state: body.state ?? null, country: body.country ?? null, pin_code: body.pin_code ?? null,
     phone: String(body.phone ?? "").trim() || null, alternate_phone: body.alternate_phone ?? null, email: String(body.email ?? "").trim() || null,
-    alternate_email: body.alternate_email ?? null, pan_number: body.pan_number ?? null,
+    alternate_email: body.alternate_email ?? null, pan_number: body.pan_number ?? null, aadhaar_number: body.aadhaar_number ?? null,
     occupation: body.occupation ?? null, organization: body.organization ?? null, designation: body.designation ?? null, created_by: user.id
   }).select("id").single();
   if (customerError) return NextResponse.json({ error: customerError.message }, { status: 500 });

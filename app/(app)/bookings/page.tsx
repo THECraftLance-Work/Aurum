@@ -95,7 +95,7 @@ export default async function BookingsPage({
             {/* Desktop: fixed-layout table so a long unbroken string truncates
                 instead of blowing out the column widths. */}
             <div className="hidden max-h-[calc(100vh-250px)] overflow-auto overscroll-contain sm:block">
-              <table className="w-full table-fixed text-sm">
+                <table className="min-w-[1060px] w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[120px]" />
                   <col className="w-[180px]" />
@@ -106,7 +106,7 @@ export default async function BookingsPage({
                   <col className="w-[140px]" />
                   <col className="w-[110px]" />
                 </colgroup>
-                <thead className="bg-slate-50 text-left text-slate-500">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                   <tr>
                     <th className="px-5 py-3 font-medium">Booking</th>
                     <th className="px-5 py-3 font-medium">Customer</th>

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, X, Loader2 } from "lucide-react";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 export default function ReviewActions({ bookingId }: { bookingId: string }) {
@@ -38,7 +38,7 @@ export default function ReviewActions({ bookingId }: { bookingId: string }) {
         <div className="mt-4 flex gap-2">
           <button onClick={() => { setMode("idle"); setReason(""); }} className="btn-secondary flex-1" disabled={busy}>Cancel</button>
           <button onClick={() => submit("REJECTED")} className="btn-danger flex-1" disabled={busy || reason.trim().length < 3}>
-            {busy ? "Rejecting…" : "Confirm reject"}
+            {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Rejecting…</> : "Confirm reject"}
           </button>
         </div>
       </div>

@@ -64,6 +64,7 @@ export async function POST(req: Request) {
       email: person.email?.trim() || null,
       alternate_email: person.alternate_email?.trim() || null,
       pan_number: person.pan_number?.trim().toUpperCase() || null,
+      aadhaar_number: person.aadhaar_number?.trim() || null,
       occupation: person.occupation?.trim() || null,
       organization: person.organization?.trim() || null,
       designation: person.designation?.trim() || null,
@@ -195,42 +196,40 @@ export async function POST(req: Request) {
   }
 
   // 5. Notify accountants
-  await notifyRole("ACCOUNTANT", {
-    category: "BOOKING",
-    title: "New booking submitted",
-    message: `${profile.name} submitted booking ${bk.booking_id} for verification.`,
-    entityType: "booking",
-    entityId: bk.id,
-    priority: "HIGH"
-  });
-
-  // 6. Audit
-  await writeAudit({
-    actorUserId: profile.id,
-    actorRole: profile.role,
-    action: "BOOKING_CREATE",
-    entityType: "booking",
-    entityId: bk.id,
-    newData: { booking_id: bk.booking_id, project_name: booking.project_name, unit_number: booking.unit_number, total_property_value: totalValue }
-  });
-
-  // 7. Outbound bridge (WhatsApp + email to the internal ops list).
-  //    dispatchOutbound never throws — a failed alert must not turn a
-  //    successfully-created booking into a 500.
-  await dispatchOutbound({
-    key: "BOOKING_SUBMITTED",
-    entityId: bk.id,
-    data: {
-      bookingRef: bk.booking_id,
-      bookingUuid: bk.id,
-      submitterName: profile.name,
-      customerName: customerList[0].name,
-      customerEmail: customerList[0].email ?? null,
-      project: booking.project_name,
-      unit: booking.unit_number,
-      totalValue
-    }
-  });
+  // These independent side effects run together so the redirect is not held
+  // up by three sequential network/database operations.
+  await Promise.all([
+    notifyRole("ACCOUNTANT", {
+      category: "BOOKING",
+      title: "New booking submitted",
+      message: `${profile.name} submitted booking ${bk.booking_id} for verification.`,
+      entityType: "booking",
+      entityId: bk.id,
+      priority: "HIGH"
+    }),
+    writeAudit({
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      action: "BOOKING_CREATE",
+      entityType: "booking",
+      entityId: bk.id,
+      newData: { booking_id: bk.booking_id, project_name: booking.project_name, unit_number: booking.unit_number, total_property_value: totalValue }
+    }),
+    dispatchOutbound({
+      key: "BOOKING_SUBMITTED",
+      entityId: bk.id,
+      data: {
+        bookingRef: bk.booking_id,
+        bookingUuid: bk.id,
+        submitterName: profile.name,
+        customerName: customerList[0].name,
+        customerEmail: customerList[0].email ?? null,
+        project: booking.project_name,
+        unit: booking.unit_number,
+        totalValue
+      }
+    }),
+  ]);
 
   return NextResponse.json({ id: bk.id, booking_id: bk.booking_id });
 }

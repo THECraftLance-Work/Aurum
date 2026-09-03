@@ -87,7 +87,7 @@ export default async function PublicBookingPage({ params }: { params: Promise<{ 
 
             <div className="card p-5">
               <h3 className="mb-4 text-sm font-semibold text-slate-900">Financial</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Stat label="Total value" value={formatINR(b.total_property_value)} />
                 <Stat label="Total paid" value={formatINR(b.total_amount_paid)} tone="emerald" />
                 <Stat label="Remaining" value={formatINR(b.remaining_balance)} tone="amber" />

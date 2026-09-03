@@ -26,7 +26,7 @@ export default async function BookingDetail({
 
   const { data: b } = await supabase
     .from("bookings")
-    .select("*, customer:customer_id(name, phone, email)")
+    .select("*, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, occupation, organization, designation)")
     .eq("id", id)
     .maybeSingle();
   if (!b) notFound();
@@ -60,7 +60,7 @@ export default async function BookingDetail({
       supabase
         .from("booking_customers")
         .select(
-          "id, is_primary, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, occupation, organization, designation)",
+          "id, is_primary, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, aadhaar_number, occupation, organization, designation)",
         )
         .eq("booking_id", b.id)
         .order("is_primary", { ascending: false })
@@ -119,7 +119,7 @@ export default async function BookingDetail({
         }
       />
 
-      <div className="h-[calc(100vh-175px)] overflow-y-auto overscroll-contain pr-1">
+      <div className="h-[calc(100vh-175px)] overflow-y-auto overscroll-contain pb-24 pr-1">
         <div className="grid items-start gap-4 xl:grid-cols-3">
           <div className="xl:col-span-2 space-y-4">
             <div className="card p-5">
@@ -198,6 +198,7 @@ export default async function BookingDetail({
                         value={
                           [
                             person.customer?.pan_number,
+                            person.customer?.aadhaar_number,
                           ]
                             .filter(Boolean)
                             .join(" · ") || "—"
