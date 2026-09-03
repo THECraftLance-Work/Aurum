@@ -47,16 +47,34 @@ export async function POST(req: Request) {
 
   const admin = createSupabaseAdmin();
 
+  function customerInsert(person: any) {
+    return {
+      title: person.title?.trim() || null,
+      name: person.name.trim(),
+      father_spouse_name: person.father_spouse_name?.trim() || null,
+      date_of_birth: person.date_of_birth || null,
+      address: person.address?.trim() || null,
+      city: person.city?.trim() || null,
+      state: person.state?.trim() || null,
+      country: person.country?.trim() || null,
+      pin_code: person.pin_code?.trim() || null,
+      phone: person.phone?.trim() || null,
+      alternate_phone: person.alternate_phone?.trim() || null,
+      email: person.email?.trim() || null,
+      alternate_email: person.alternate_email?.trim() || null,
+      pan_number: person.pan_number?.trim().toUpperCase() || null,
+      aadhaar_number: person.aadhaar_number?.trim() || null,
+      occupation: person.occupation?.trim() || null,
+      organization: person.organization?.trim() || null,
+      designation: person.designation?.trim() || null,
+      created_by: profile.id,
+    };
+  }
+
   // 1. Insert customer
   const { data: cust, error: custErr } = await admin
     .from("customers")
-    .insert({
-      name: customerList[0].name,
-      phone: customerList[0].phone ?? null,
-      email: customerList[0].email ?? null,
-      ...customerList[0],
-      created_by: profile.id
-    })
+    .insert(customerInsert(customerList[0]))
     .select("id")
     .single();
   if (custErr) return NextResponse.json({ error: custErr.message }, { status: 500 });
@@ -120,7 +138,7 @@ export async function POST(req: Request) {
     if (!person?.name) continue;
     let customerId = index === 0 ? cust.id : null;
     if (!customerId) {
-      const { data: extra, error: extraErr } = await admin.from("customers").insert({ ...person, name: person.name.trim(), phone: person.phone?.trim() || null, email: person.email?.trim() || null, created_by: profile.id }).select("id").single();
+      const { data: extra, error: extraErr } = await admin.from("customers").insert(customerInsert(person)).select("id").single();
       if (extraErr) return NextResponse.json({ error: extraErr.message }, { status: 500 });
       customerId = extra.id;
     }
