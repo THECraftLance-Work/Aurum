@@ -64,7 +64,6 @@ export async function POST(req: Request) {
       email: person.email?.trim() || null,
       alternate_email: person.alternate_email?.trim() || null,
       pan_number: person.pan_number?.trim().toUpperCase() || null,
-      aadhaar_number: person.aadhaar_number?.trim() || null,
       occupation: person.occupation?.trim() || null,
       organization: person.organization?.trim() || null,
       designation: person.designation?.trim() || null,

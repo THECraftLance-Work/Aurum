@@ -60,7 +60,7 @@ export default async function BookingDetail({
       supabase
         .from("booking_customers")
         .select(
-          "id, is_primary, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, aadhaar_number, occupation, organization, designation)",
+          "id, is_primary, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, occupation, organization, designation)",
         )
         .eq("booking_id", b.id)
         .order("is_primary", { ascending: false })
@@ -198,7 +198,6 @@ export default async function BookingDetail({
                         value={
                           [
                             person.customer?.pan_number,
-                            person.customer?.aadhaar_number,
                           ]
                             .filter(Boolean)
                             .join(" · ") || "—"
