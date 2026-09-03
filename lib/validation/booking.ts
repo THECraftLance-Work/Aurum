@@ -113,6 +113,7 @@ export const bookingSchema = z.object({
 });
 
 export function validationMessage(result: z.SafeParseError<unknown>) {
-  const issue = result.error.issues[0];
-  return `${issue.path.join(".") || "Form"}: ${issue.message}`;
+  return result.error.issues
+    .map((issue) => `${issue.path.join(".") || "Form"}: ${issue.message}`)
+    .join("; ");
 }

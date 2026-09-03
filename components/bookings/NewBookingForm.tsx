@@ -686,6 +686,12 @@ export default function NewBookingForm({ role }: { role: string }) {
               bold
             />
           </div>
+          {!valid && validation.message && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+              <p className="font-semibold">Please correct the following before submitting:</p>
+              <p className="mt-1 break-words">{validation.message}</p>
+            </div>
+          )}
           {error && (
             <div className="mt-4 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">
               {error}
