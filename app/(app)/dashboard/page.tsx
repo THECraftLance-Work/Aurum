@@ -66,7 +66,7 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
-        title={`${user.name.split(" ")[0]} 🖐️`}
+        title={`Hello ${user.name.split(" ")[0]} 🖐️, `}
         description={`${roleLabels[user.role]} · here's what's happening today.`}
         actions={
           <div className="flex items-center gap-2">
