@@ -26,10 +26,10 @@ export async function POST(req: Request) {
   const { error: profileError } = await admin.from("app_users").insert({ id: created.user.id, name, email, phone: body.phone?.trim() || null, role, requested_role: role, auth_provider: "EMAIL", status: "APPROVED", approved_at: new Date().toISOString(), approved_by: user.id });
   if (profileError) { await admin.auth.admin.deleteUser(created.user.id); return NextResponse.json({ error: profileError.message }, { status: 500 }); }
 
-  // Notify the employee: "your account has been created in AURUM" — retry 2-3 times is safe (dedupeKey makes re-creates idempotent, new users always send)
+  // Notify the employee: "your account has been created in AURUM" — includes temp password for normal (EMAIL) accounts
   for (let attempt = 0; attempt < 1; attempt++) {
     try {
-      const mail = buildWelcomeEmail(name, email, role);
+      const mail = buildWelcomeEmail(name, email, role, password);
       const ok = await enqueueDirectEmail({
         eventKey: "USER_CREATED",
         to: email,

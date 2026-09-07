@@ -440,35 +440,44 @@ export function buildPaymentEmail(d: PaymentAlertData) {
   };
 }
 
-export function buildWelcomeEmail(userName: string, userEmail: string, userRole: string) {
+export function buildWelcomeEmail(userName: string, userEmail: string, userRole: string, tempPassword?: string | null) {
   const href = appUrl();
   return {
     subject: `Your account has been created in AURUM`,
     ...renderEmail({
-      preheader: `Your AURUM account is ready — ${userRole} access. Sign in with email + password or Google.`,
+      preheader: `Your AURUM account is ready — ${userRole} access. Sign in now.`,
       eyebrow: "Account created",
       heading: `Your account has been created in AURUM`,
       greeting: `Hello ${firstName(userName)},`,
       intro: [
-        `Your account on ${BRAND.name} (${BRAND.product}) has been created by your Director. You can sign in immediately.`,
-        `Use your work email and the temporary password shared with you, or Continue with Google if your email is a Google Workspace account.`
+        `Your account on ${BRAND.name} (${BRAND.product}) has been created by your Director. You can sign in immediately.`
       ],
+      highlight: tempPassword
+        ? { label: "Temporary password", value: tempPassword, sub: "Use this once, then change it after first login", tone: "warning" as const }
+        : undefined,
       sections: [
         {
           title: "Your account",
           rows: [
             ["Name", userName],
             ["Email", userEmail],
-            ["Role", userRole]
+            ["Role", userRole],
+            ...(tempPassword ? [["Sign-in method", "Email + temporary password (or Google if Workspace)"]] as Row[] : [])
           ]
         }
       ],
       cta: { href, label: "Sign in to AURUM" },
-      callout: {
-        tone: "warning",
-        title: "Keep this account to yourself",
-        text: "Bookings and customer documents on this platform are confidential. Never share your sign-in details, and sign out on shared devices."
-      },
+      callout: tempPassword
+        ? {
+            tone: "negative" as const,
+            title: "Change this password after first login",
+            text: "This temporary password is sent once by email. Change it in My Profile after you sign in, and do not forward this email."
+          }
+        : {
+            tone: "warning" as const,
+            title: "Keep this account to yourself",
+            text: "Bookings and customer documents on this platform are confidential. Never share your sign-in details, and sign out on shared devices."
+          },
       outro: ["If you were not expecting this, please contact your Director immediately."],
       footerReason:
         "You are receiving this because a Director created an account for this address in AURUM.",

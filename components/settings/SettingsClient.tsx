@@ -27,6 +27,7 @@ export default function SettingsClient() {
   function toggleSound() {
     const next = !sound; setSound(next);
     try { localStorage.setItem("notif_sound", next ? "on" : "off"); } catch {}
+    if (next) void playNotificationSound();
   }
 
   function toggleCategory(category: keyof typeof categories) {

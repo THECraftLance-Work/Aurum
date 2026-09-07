@@ -1,8 +1,15 @@
+import { redirect } from "next/navigation";
+import { getAuthUserWithProfile } from "@/lib/auth/session";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import RegisterForm from "./RegisterForm";
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const { profile } = await getAuthUserWithProfile();
+  if (profile) {
+    if (profile.status === "APPROVED") redirect("/dashboard");
+    redirect("/pending");
+  }
   return (
     <div className="w-full">
       {/* Top Mode Switcher Tabs */}

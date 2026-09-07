@@ -19,24 +19,29 @@ export function isNotificationCategoryEnabled(category: string) {
 
 /** Uses Web Audio instead of shipping an audio asset. It is intentionally
  * short and only runs for high-priority realtime events or a manual test. */
-export function playNotificationSound() {
+export async function playNotificationSound() {
   if (typeof window === "undefined" || !isNotificationSoundEnabled()) return;
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   if (!AudioContextClass) return;
-  const context = new AudioContextClass();
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(1480, context.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(1980, context.currentTime + 0.14);
-  gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.075, context.currentTime + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.18);
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.2);
-  oscillator.addEventListener("ended", () => void context.close());
+  try {
+    const context = new AudioContextClass();
+    if (context.state === "suspended") await context.resume();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(1480, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1980, context.currentTime + 0.14);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.075, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.18);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.2);
+    oscillator.addEventListener("ended", () => void context.close());
+    // Fallback close if ended doesn't fire (suspended)
+    setTimeout(() => { try { context.close(); } catch {} }, 500);
+  } catch {}
 }
 
 export function showBrowserNotification(title: string, body: string) {

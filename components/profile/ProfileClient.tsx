@@ -5,7 +5,7 @@ import { createSupabaseBrowser } from "@/lib/supabase/client";
 import { roleLabels, roleAccent, formatDate } from "@/lib/utils/format";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils/cn";
-import { User, Mail, Phone, Shield, Building, CheckCircle, Save } from "lucide-react";
+import { User, Mail, Phone, Shield, Building, CheckCircle, Save, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function ProfileClient({ profile }: { profile: any }) {
   const router = useRouter();
@@ -15,6 +15,12 @@ export default function ProfileClient({ profile }: { profile: any }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [pwError, setPwError] = useState<string | null>(null);
 
   const accent = roleAccent[profile.role] ?? roleAccent.SM;
 
@@ -36,6 +42,18 @@ export default function ProfileClient({ profile }: { profile: any }) {
       setMessage("Profile updated successfully!");
       router.refresh();
     }
+  }
+
+  async function handlePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMsg(null); setPwError(null);
+    if (newPw.length < 8) return setPwError("Password must be at least 8 characters.");
+    if (newPw !== confirmPw) return setPwError("Passwords do not match.");
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setPwSaving(false);
+    if (error) setPwError(error.message);
+    else { setPwMsg("Password updated successfully!"); setNewPw(""); setConfirmPw(""); }
   }
 
   return (
@@ -145,6 +163,37 @@ export default function ProfileClient({ profile }: { profile: any }) {
           </div>
         </form>
       </div>
+
+      {/* Update Password — only for normal EMAIL accounts */}
+      {profile.auth_provider !== "GOOGLE" && (
+        <div className="card p-6 bg-white border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
+            <Lock className="h-4 w-4 text-[#ec3013]" />
+            <span>Update password</span>
+            <span className="ml-2 text-[11px] font-normal text-slate-500">For email accounts</span>
+          </h3>
+          <form onSubmit={handlePassword} className="space-y-3 max-w-md">
+            <div>
+              <label className="label">New password</label>
+              <div className="relative">
+                <input className="input pr-10" type={showPw ? "text" : "password"} required minLength={8} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="8+ characters" />
+                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 text-slate-500" tabIndex={-1}>{showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+              </div>
+            </div>
+            <div>
+              <label className="label">Confirm password</label>
+              <div className="relative">
+                <input className="input pr-10" type={showPw ? "text" : "password"} required minLength={8} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Repeat password" />
+                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 text-slate-500" tabIndex={-1}>{showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+              </div>
+            </div>
+            {pwMsg && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 flex items-center gap-2"><CheckCircle className="h-4 w-4" />{pwMsg}</div>}
+            {pwError && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{pwError}</div>}
+            <button type="submit" disabled={pwSaving} className="btn-primary h-10">{pwSaving ? "Updating…" : "Update password"}</button>
+          </form>
+          <p className="mt-3 text-xs text-slate-500">Google sign-in accounts manage password via Google.</p>
+        </div>
+      )}
 
       {/* Permissions & Security Summary */}
       <div className="card p-6 bg-white border border-slate-200 shadow-sm">

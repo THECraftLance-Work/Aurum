@@ -10,6 +10,7 @@ export type SessionUser = {
   role: "SM" | "CP" | "ACCOUNTANT" | "ADMIN" | "DIRECTOR";
   status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED" | "DISABLED";
   avatar_url?: string | null;
+  auth_provider?: "GOOGLE" | "EMAIL" | null;
 };
 
 /**
@@ -27,7 +28,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 
   const { data: profile } = await supabase
     .from("app_users")
-    .select("id, email, name, role, status, avatar_url")
+    .select("id, email, name, role, status, avatar_url, auth_provider")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -39,7 +40,7 @@ export const getAuthUserWithProfile = cache(async (): Promise<{ user: any | null
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { user: null, profile: null, revoked: false };
-  const { data: profile } = await supabase.from("app_users").select("id, email, name, role, status, avatar_url").eq("id", user.id).maybeSingle();
+  const { data: profile } = await supabase.from("app_users").select("id, email, name, role, status, avatar_url, auth_provider").eq("id", user.id).maybeSingle();
   if (!profile) return { user, profile: null, revoked: true };
   return { user, profile: profile as SessionUser, revoked: false };
 });
