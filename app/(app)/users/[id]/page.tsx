@@ -19,18 +19,18 @@ export default async function DirectorUserDetail({ params }: { params: Promise<{
   if (!u) notFound();
 
   const [{ data: rawBookings }, { data: rawTickets }] = await Promise.all([
-    admin.from("bookings").select("*, customer:customer_id(id, name, phone, email)").eq("created_by", u.id).order("created_at", { ascending: false }),
-    admin.from("tickets").select("*").eq("raised_by", u.id).order("created_at", { ascending: false }),
+    admin.from("bookings").select("*, customer:customer_id(id, name, phone, email)").eq("created_by", u.id).order("created_at", { ascending: false }).limit(100),
+    admin.from("tickets").select("*").eq("raised_by", u.id).order("created_at", { ascending: false }).limit(100),
   ]);
 
   const bookingIds: string[] = (rawBookings ?? []).map((b: any) => b.id);
   const ticketIds: string[] = (rawTickets ?? []).map((t: any) => t.id);
 
   const [paymentsByBooking, attachmentsByBooking, ticketComments, userAttachments] = await Promise.all([
-    bookingIds.length ? admin.from("payments").select("*, submitter:submitted_by(name), reviewer:reviewed_by(name)").in("booking_id", bookingIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [] as any[] } as any),
-    bookingIds.length ? admin.from("attachments").select("id, entity_type, entity_id, file_name, file_size, mime_type, label, created_at, uploader:uploaded_by(name)").eq("entity_type", "booking").in("entity_id", bookingIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [] as any[] } as any),
-    ticketIds.length ? admin.from("ticket_comments").select("*, author:author_id(name, role)").in("ticket_id", ticketIds).order("created_at", { ascending: true }) : Promise.resolve({ data: [] as any[] } as any),
-    admin.from("attachments").select("id, entity_type, entity_id, file_name, file_size, mime_type, label, created_at, uploader:uploaded_by(name)").eq("uploaded_by", u.id).order("created_at", { ascending: false }),
+    bookingIds.length ? admin.from("payments").select("*, submitter:submitted_by(name), reviewer:reviewed_by(name)").in("booking_id", bookingIds).order("created_at", { ascending: false }).limit(300) : Promise.resolve({ data: [] as any[] } as any),
+    bookingIds.length ? admin.from("attachments").select("id, entity_type, entity_id, file_name, file_size, mime_type, label, created_at, uploader:uploaded_by(name)").eq("entity_type", "booking").in("entity_id", bookingIds).order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: [] as any[] } as any),
+    ticketIds.length ? admin.from("ticket_comments").select("*, author:author_id(name, role)").in("ticket_id", ticketIds).order("created_at", { ascending: true }).limit(300) : Promise.resolve({ data: [] as any[] } as any),
+    admin.from("attachments").select("id, entity_type, entity_id, file_name, file_size, mime_type, label, created_at, uploader:uploaded_by(name)").eq("uploaded_by", u.id).order("created_at", { ascending: false }).limit(200),
   ]);
 
   const payments = (paymentsByBooking as any)?.data ?? [];

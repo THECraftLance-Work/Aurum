@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
+import { reportMissedRecordAccess } from "@/lib/security/access-alert";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import PageHeader from "@/components/ui/PageHeader";
@@ -41,7 +42,17 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
     .eq("id", id)
     .maybeSingle();
 
-  if (!p) notFound();
+  if (!p) {
+    // See the same guard on the booking detail page — distinguish a missing
+    // payment from one that belongs to a colleague before alerting.
+    await reportMissedRecordAccess({
+      table: "payments",
+      recordId: id,
+      actor: user,
+      path: `/payments/${id}`
+    });
+    notFound();
+  }
 
   const booking: any = Array.isArray(p.booking) ? p.booking[0] : p.booking;
   const dir = await resolveDirectory([p.submitted_by, p.reviewed_by]);

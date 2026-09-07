@@ -3,6 +3,8 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { notifyRole, writeAudit } from "@/lib/utils/notifications";
 import { dispatchOutbound } from "@/lib/integrations/outbound";
+import { resolveBookingContacts } from "@/lib/integrations/contacts";
+import { reportAccessAttempt } from "@/lib/security/access-alert";
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer();
@@ -11,6 +13,9 @@ export async function POST(req: Request) {
 
   const { data: profile } = await supabase.from("app_users").select("id, role, status, name").eq("id", user.id).maybeSingle();
   if (!profile || profile.status !== "APPROVED") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!["SM", "CP", "ADMIN", "DIRECTOR"].includes(profile.role)) {
+    return NextResponse.json({ error: "Role not permitted." }, { status: 403 });
+  }
 
   const { booking_id, amount, payment_date, payment_mode, reference_no, attachment } = await req.json();
   if (!booking_id || !amount || !payment_date || !payment_mode) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -18,10 +23,37 @@ export async function POST(req: Request) {
   const admin = createSupabaseAdmin();
   const { data: bk } = await admin
     .from("bookings")
-    .select("id, booking_id, remaining_balance, total_amount_paid, total_property_value, customer:customer_id(name, email)")
+    .select("id, booking_id, created_by, remaining_balance, total_amount_paid, total_property_value, customer:customer_id(name, email)")
     .eq("id", booking_id)
     .maybeSingle();
   if (!bk) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+
+  /**
+   * Ownership gate.
+   *
+   * The read above uses the service-role client, which bypasses RLS, so
+   * without this an approved Sales Manager could POST any booking UUID and
+   * attach a payment to a colleague's booking — a cross-employee write that
+   * the `payments_write` policy would otherwise have blocked. Directors get an
+   * alert rather than a silent 404, because guessing another employee's
+   * booking id is not something that happens by accident.
+   */
+  const isOversight = ["ADMIN", "DIRECTOR"].includes(profile.role);
+  if (bk.created_by !== profile.id && !isOversight) {
+    await reportAccessAttempt({
+      actorId: profile.id,
+      actorName: profile.name,
+      actorRole: profile.role,
+      resourceType: "booking",
+      resourceId: bk.id,
+      resourceLabel: bk.booking_id,
+      ownerId: bk.created_by,
+      action: "Tried to record a payment on another employee's booking",
+      path: "/api/payments"
+    });
+    return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  }
+
   if (Number(amount) > Number(bk.remaining_balance)) return NextResponse.json({ error: "Exceeds remaining balance" }, { status: 400 });
 
   // Idempotency guard: reject if an identical payment was inserted in the last 15 seconds
@@ -81,6 +113,10 @@ export async function POST(req: Request) {
     newData: { booking_id, amount, payment_mode }
   });
 
+  // Everyone named on the booking — primary buyer plus anyone added through
+  // Attach person — receives the customer copy of this payment.
+  const contacts = await resolveBookingContacts(bk.id);
+
   // Outbound bridge. Sits AFTER the idempotency guard above on purpose — a
   // deduped double-POST returns early and must not re-notify.
   await dispatchOutbound({
@@ -92,6 +128,7 @@ export async function POST(req: Request) {
       submitterName: profile.name,
       customerName: (bk as any).customer?.name ?? "—",
       customerEmail: (bk as any).customer?.email ?? null,
+      contacts,
       amount: Number(amount),
       mode: payment_mode,
       reference: reference_no ?? null,

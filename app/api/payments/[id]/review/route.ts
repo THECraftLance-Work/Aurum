@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendNotification, writeAudit } from "@/lib/utils/notifications";
 import { formatINR } from "@/lib/utils/format";
 import { dispatchOutbound } from "@/lib/integrations/outbound";
+import { resolveBookingContacts } from "@/lib/integrations/contacts";
 
 const Body = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
@@ -95,45 +96,91 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
   const ref = booking?.booking_id ?? "this booking";
-  await sendNotification({
-    recipientUserId: pay.submitted_by,
-    category: decision === "APPROVED" ? "APPROVAL" : "REJECTION",
-    title: decision === "APPROVED" ? "Payment approved" : "Payment rejected",
-    message: decision === "APPROVED"
-      ? `Your payment of ${formatINR(pay.amount)} on ${ref} was approved by ${profile.name}.`
-      : `Your payment of ${formatINR(pay.amount)} on ${ref} was rejected. Reason: ${reason}`,
-    entityType: "payment",
-    entityId: pay.id,
-    priority: "HIGH"
-  });
 
-  await writeAudit({
-    actorUserId: profile.id,
-    actorRole: profile.role,
-    action: decision === "APPROVED" ? "PAYMENT_APPROVE" : "PAYMENT_REJECT",
-    entityType: "payment",
-    entityId: pay.id,
-    oldData: { status: pay.status },
-    newData: { status: decision, amount: pay.amount },
-    reason: reason ?? undefined
-  });
+  /**
+   * Four independent side effects. They used to run one after another, so an
+   * accountant clicking Approve waited on four sequential Supabase round-trips
+   * before the button came back. Nothing here depends on anything else here,
+   * so they go together — the slowest one now sets the latency instead of the
+   * sum. `contacts` is resolved in the same batch because the outbound call
+   * below needs it and it is a read against a different table.
+   */
+  // If this payment was the first verification for a still-SUBMITTED booking,
+  // promote the booking to APPROVED as well so the list stops showing
+  // SUBMITTED for a booking that already has approved money. Without this a
+  // booking stayed SUBMITTED forever unless someone opened the booking
+  // verification queue separately.
+  if (decision === "APPROVED" && booking?.id) {
+    const { data: curBk } = await admin.from("bookings").select("status").eq("id", booking.id).maybeSingle();
+    if (curBk && ["SUBMITTED", "UNDER_REVIEW", "UPDATED"].includes(curBk.status)) {
+      await admin.from("bookings").update({
+        status: "APPROVED",
+        reviewed_by: profile.id,
+        approved_at: now,
+        updated_at: now,
+      }).eq("id", booking.id);
+      await writeAudit({
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        action: "BOOKING_APPROVE",
+        entityType: "booking",
+        entityId: booking.id,
+        oldData: { status: curBk.status },
+        newData: { status: "APPROVED" },
+        reason: `Auto-approved on payment ${pay.id} verification`,
+      });
+    }
+  }
 
-  // Cancel the held "payment recorded, pending verification" note if it has not
-  // gone out yet. Without this the customer gets that mail and the outcome mail
-  // within a minute of each other, which reads as duplicate spam.
-  const { data: cancelled } = await admin
-    .from("notification_deliveries")
-    .update({
-      status: "SKIPPED",
-      provider: "none",
-      error_code: "SUPERSEDED",
-      error_message: "Payment was verified before the pending note was due",
-      updated_at: now
-    })
-    .eq("entity_id", pay.id)
-    .eq("event_key", "PAYMENT_ADDED_CUSTOMER")
-    .in("status", ["QUEUED", "FAILED"])
-    .select("id");
+  const [, , { data: cancelled }, contacts] = await Promise.all([
+    sendNotification({
+      recipientUserId: pay.submitted_by,
+      category: decision === "APPROVED" ? "APPROVAL" : "REJECTION",
+      title: decision === "APPROVED" ? "Payment approved" : "Payment rejected",
+      message: decision === "APPROVED"
+        ? `Your payment of ${formatINR(pay.amount)} on ${ref} was approved by ${profile.name}.`
+        : `Your payment of ${formatINR(pay.amount)} on ${ref} was rejected. Reason: ${reason}`,
+      entityType: "payment",
+      entityId: pay.id,
+      priority: "HIGH"
+    }),
+
+    writeAudit({
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      action: decision === "APPROVED" ? "PAYMENT_APPROVE" : "PAYMENT_REJECT",
+      entityType: "payment",
+      entityId: pay.id,
+      oldData: { status: pay.status },
+      newData: { status: decision, amount: pay.amount },
+      reason: reason ?? undefined
+    }),
+
+    // Cancel the held "payment recorded, pending verification" note if it has
+    // not gone out yet. Without this the customer gets that mail and the
+    // outcome mail within a minute of each other, which reads as duplicate
+    // spam. Safe to run alongside the enqueue below: this targets the
+    // PAYMENT_ADDED_CUSTOMER rows, the enqueue writes PAYMENT_REVIEWED_CUSTOMER
+    // rows, so they never touch the same records.
+    admin
+      .from("notification_deliveries")
+      .update({
+        status: "SKIPPED",
+        provider: "none",
+        error_code: "SUPERSEDED",
+        error_message: "Payment was verified before the pending note was due",
+        updated_at: now
+      })
+      .eq("entity_id", pay.id)
+      .eq("event_key", "PAYMENT_ADDED_CUSTOMER")
+      .in("status", ["QUEUED", "FAILED"])
+      .select("id"),
+
+    // The verification outcome goes to everyone named on the booking, not only
+    // the primary buyer — a co-buyer attached later has the same stake in it.
+    resolveBookingContacts(booking?.id ?? pay.booking_id)
+  ]);
+
   if (cancelled?.length) {
     console.info(`[payments] superseded ${cancelled.length} pending-note email(s) for ${pay.id}`);
   }
@@ -156,6 +203,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       submitterName: profile.name,
       customerName: cust?.name ?? "—",
       customerEmail: cust?.email ?? null,
+      contacts,
       amount: Number(pay.amount),
       mode: pay.payment_mode,
       reference: pay.reference_no ?? null,

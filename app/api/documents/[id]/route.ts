@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { reportAccessAttempt } from "@/lib/security/access-alert";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,21 @@ export async function GET(
   // 404 rather than 403: revealing that a given id exists tells an unauthorised
   // caller something they shouldn't learn.
   if (!allowed) {
+    // The document does exist — we just read it — so this is unambiguously an
+    // attempt on another employee's file, not a stale link. Directors are told.
+    const { data: actor } = await admin
+      .from("app_users").select("name").eq("id", profile.id).maybeSingle();
+    await reportAccessAttempt({
+      actorId: profile.id,
+      actorName: actor?.name ?? "Unknown user",
+      actorRole: profile.role,
+      resourceType: "document",
+      resourceId: att.id,
+      resourceLabel: att.file_name,
+      ownerId: att.uploaded_by,
+      action: "Tried to download another employee's document",
+      path: `/api/documents/${id}`
+    });
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

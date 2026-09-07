@@ -35,7 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Total value cannot be lower than approved payments." }, { status: 400 });
   }
 
-  const next = {
+  const next: Record<string, any> = {
     project_name: projectName,
     unit_number: unitNumber,
     property_details: String(body.property_details ?? "").trim() || null,
@@ -45,6 +45,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     booking_date: body.booking_date || null,
     block: String(body.block ?? "").trim() || null,
     facing: String(body.facing ?? "").trim() || null,
+    sales_representative: body.sales_representative !== undefined ? String(body.sales_representative ?? "").trim() || null : current.sales_representative,
+    team_manager: body.team_manager !== undefined ? String(body.team_manager ?? "").trim() || null : current.team_manager,
+    saleable_area: body.saleable_area !== undefined && body.saleable_area !== "" && body.saleable_area !== null ? Number(body.saleable_area) : current.saleable_area,
+    carpet_area: body.carpet_area !== undefined && body.carpet_area !== "" && body.carpet_area !== null ? Number(body.carpet_area) : current.carpet_area,
+    external_walls_area: body.external_walls_area !== undefined && body.external_walls_area !== "" && body.external_walls_area !== null ? Number(body.external_walls_area) : current.external_walls_area,
+    balcony_utility_area: body.balcony_utility_area !== undefined && body.balcony_utility_area !== "" && body.balcony_utility_area !== null ? Number(body.balcony_utility_area) : current.balcony_utility_area,
+    common_area: body.common_area !== undefined && body.common_area !== "" && body.common_area !== null ? Number(body.common_area) : current.common_area,
+    sale_consideration_per_sqft: body.sale_consideration_per_sqft !== undefined && body.sale_consideration_per_sqft !== "" && body.sale_consideration_per_sqft !== null ? Number(body.sale_consideration_per_sqft) : current.sale_consideration_per_sqft,
+    source_of_booking: body.source_of_booking !== undefined ? String(body.source_of_booking ?? "").trim() || null : current.source_of_booking,
+    payment_source: body.payment_source !== undefined ? String(body.payment_source ?? "").trim() || null : current.payment_source,
+    purchase_purpose: body.purchase_purpose !== undefined ? String(body.purchase_purpose ?? "").trim() || null : current.purchase_purpose,
+    cp_agent_name: body.cp_agent_name !== undefined ? String(body.cp_agent_name ?? "").trim() || null : current.cp_agent_name,
+    cp_rera_id: body.cp_rera_id !== undefined ? String(body.cp_rera_id ?? "").trim() || null : current.cp_rera_id,
     status: "UPDATED",
     updated_at: new Date().toISOString(),
   };

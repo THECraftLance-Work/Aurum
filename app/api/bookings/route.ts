@@ -3,6 +3,7 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { notifyRole, writeAudit } from "@/lib/utils/notifications";
 import { dispatchOutbound } from "@/lib/integrations/outbound";
+import { normalizeContacts } from "@/lib/integrations/contacts";
 import { bookingSchema, customerSchema, validationMessage } from "@/lib/validation/booking";
 
 export async function POST(req: Request) {
@@ -224,6 +225,16 @@ export async function POST(req: Request) {
         submitterName: profile.name,
         customerName: customerList[0].name,
         customerEmail: customerList[0].email ?? null,
+        // Every buyer named on the booking gets the confirmation, not just the
+        // first one. Built from the submitted list rather than re-reading
+        // booking_customers, which is the same data one round-trip cheaper.
+        contacts: normalizeContacts(
+          customerList.map((p: any, i: number) => ({
+            name: p?.name,
+            email: p?.email,
+            isPrimary: i === 0
+          }))
+        ),
         project: booking.project_name,
         unit: booking.unit_number,
         totalValue

@@ -1,5 +1,21 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { kickDeliveryWorker } from "./kick";
+import { resolveRecipients } from "./recipients";
+import { whatsappEnv } from "./env";
+import { isEmail } from "./phone";
+import { normalizeContacts, type BookingContact } from "./contacts";
+import {
+  bookingWhatsAppParams,
+  paymentWhatsAppParams,
+  bookingDeepLinkParam,
+  buildBookingEmail,
+  buildPaymentEmail,
+  buildBookingCreatedEmail,
+  buildPaymentReceivedCustomerEmail,
+  buildPaymentReviewedCustomerEmail,
+  buildOverdueEmail
+} from "./templates";
+import type { OutboundEvent } from "./types";
 
 /**
  * How long the customer "pending verification" note waits before sending, so a
@@ -7,15 +23,22 @@ import { kickDeliveryWorker } from "./kick";
  * review, short enough that a real backlog still gets acknowledged.
  */
 const PENDING_NOTE_HOLD_MS = 10 * 60 * 1000;
-import { resolveRecipients } from "./recipients";
-import { whatsappEnv } from "./env";
-import { isEmail } from "./phone";
-import {
-  bookingWhatsAppParams, paymentWhatsAppParams, bookingDeepLinkParam,
-  buildBookingEmail, buildPaymentEmail, buildBookingCreatedEmail,
-  buildPaymentReceivedCustomerEmail, buildPaymentReviewedCustomerEmail
-} from "./templates";
-import type { OutboundEvent } from "./types";
+
+/**
+ * Everyone on the booking who should get the customer-facing copy.
+ *
+ * Falls back to the primary address when the caller did not resolve the
+ * junction table, so an older call site still reaches at least the main buyer
+ * rather than silently sending nothing.
+ */
+function customerAudience(d: {
+  contacts?: BookingContact[];
+  customerEmail: string | null;
+  customerName: string;
+}): BookingContact[] {
+  if (d.contacts?.length) return normalizeContacts(d.contacts);
+  return normalizeContacts([{ name: d.customerName, email: d.customerEmail, isPrimary: true }]);
+}
 
 /**
  * Enqueue one outbound delivery row per recipient per channel.
@@ -31,43 +54,89 @@ import type { OutboundEvent } from "./types";
  */
 export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: string[] }> {
   const admin = createSupabaseAdmin();
-  const rec = await resolveRecipients(event.key);
   const wa = whatsappEnv();
-
   const rows: Record<string, unknown>[] = [];
+
+  // The overdue chaser is addressed to one employee, so it needs neither the
+  // ops alert list nor the customer fan-out. Handled first and returned early.
+  if (event.key === "PAYMENT_OVERDUE") {
+    const d = event.data;
+    if (!isEmail(d.ownerEmail)) return { ids: [] };
+    const mail = buildOverdueEmail(d);
+    const { data, error } = await admin
+      .from("notification_deliveries")
+      .upsert(
+        [
+          {
+            event_key: event.key,
+            channel: "EMAIL",
+            recipient: d.ownerEmail.toLowerCase(),
+            entity_type: "booking",
+            entity_id: event.entityId,
+            subject: mail.subject,
+            payload: { html: mail.html, text: mail.text, threadKey: `overdue-${d.bookingUuid}` },
+            // The stage is part of the key, so re-running today's sweep is a
+            // no-op while next week's escalation still sends.
+            dedupe_key: `${event.key}:${event.entityId}:${d.stage}:EMAIL:${d.ownerEmail.toLowerCase()}`
+          }
+        ],
+        { onConflict: "dedupe_key", ignoreDuplicates: true }
+      )
+      .select("id");
+    if (error) {
+      console.error("[outbound] overdue enqueue failed", error.message);
+      return { ids: [] };
+    }
+    const ids = (data ?? []).map((r: { id: string }) => r.id);
+    if (ids.length) kickDeliveryWorker();
+    return { ids };
+  }
+
+  const rec = await resolveRecipients(event.key);
 
   if (event.key === "BOOKING_SUBMITTED") {
     const d = event.data;
     const mail = buildBookingEmail(d);
     for (const to of rec.email) {
       rows.push({
-        event_key: event.key, channel: "EMAIL", recipient: to,
-        entity_type: "booking", entity_id: event.entityId,
+        event_key: event.key,
+        channel: "EMAIL",
+        recipient: to,
+        entity_type: "booking",
+        entity_id: event.entityId,
         subject: mail.subject,
         payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}` },
         dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
       });
     }
 
-    // Customer-facing confirmation email
-    if (d.customerEmail && isEmail(d.customerEmail)) {
-      const customerMail = buildBookingCreatedEmail(d);
+    // Customer-facing confirmation — one personalised copy per person named on
+    // the booking, primary buyer and co-buyers alike.
+    for (const person of customerAudience(d)) {
+      const customerMail = buildBookingCreatedEmail(d, person.name, person.email);
       rows.push({
         event_key: "BOOKING_CREATED_CUSTOMER",
         channel: "EMAIL",
-        recipient: d.customerEmail,
+        recipient: person.email,
         entity_type: "booking",
         entity_id: event.entityId,
         subject: customerMail.subject,
-        payload: { html: customerMail.html, text: customerMail.text },
-        dedupe_key: `BOOKING_CREATED_CUSTOMER:${event.entityId}:EMAIL:${d.customerEmail}`
+        payload: {
+          html: customerMail.html,
+          text: customerMail.text,
+          threadKey: `booking-${d.bookingUuid}`
+        },
+        dedupe_key: `BOOKING_CREATED_CUSTOMER:${event.entityId}:EMAIL:${person.email}`
       });
     }
 
     for (const to of rec.whatsapp) {
       rows.push({
-        event_key: event.key, channel: "WHATSAPP", recipient: to,
-        entity_type: "booking", entity_id: event.entityId,
+        event_key: event.key,
+        channel: "WHATSAPP",
+        recipient: to,
+        entity_type: "booking",
+        entity_id: event.entityId,
         template_name: wa.templateBooking,
         payload: {
           bodyParams: bookingWhatsAppParams(d),
@@ -85,8 +154,11 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
       const mail = buildPaymentEmail(d);
       for (const to of rec.email) {
         rows.push({
-          event_key: event.key, channel: "EMAIL", recipient: to,
-          entity_type: "payment", entity_id: event.entityId,
+          event_key: event.key,
+          channel: "EMAIL",
+          recipient: to,
+          entity_type: "payment",
+          entity_id: event.entityId,
           subject: mail.subject,
           payload: { html: mail.html, text: mail.text },
           dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
@@ -94,12 +166,13 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
       }
     }
 
-    // Customer copy — sent on BOTH events, because email is the customer's
-    // only channel and they previously heard nothing after booking creation.
-    if (d.customerEmail && isEmail(d.customerEmail)) {
-      const mail = event.key === "PAYMENT_REVIEWED"
-        ? buildPaymentReviewedCustomerEmail(d)
-        : buildPaymentReceivedCustomerEmail(d);
+    // Customer copy — sent on BOTH events, to every person on the booking,
+    // because email is their only channel.
+    for (const person of customerAudience(d)) {
+      const mail =
+        event.key === "PAYMENT_REVIEWED"
+          ? buildPaymentReviewedCustomerEmail(d, person.name, person.email)
+          : buildPaymentReceivedCustomerEmail(d, person.name, person.email);
       // The decision is part of the key so approve-after-reject still sends.
       const suffix = event.key === "PAYMENT_REVIEWED" ? `:${d.decision}` : "";
 
@@ -119,21 +192,24 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
       rows.push({
         event_key: `${event.key}_CUSTOMER`,
         channel: "EMAIL",
-        recipient: d.customerEmail,
+        recipient: person.email,
         entity_type: "payment",
         entity_id: event.entityId,
         subject: mail.subject,
         payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}` },
         next_attempt_at: new Date(Date.now() + holdMs).toISOString(),
-        dedupe_key: `${event.key}_CUSTOMER:${event.entityId}${suffix}:EMAIL:${d.customerEmail}`
+        dedupe_key: `${event.key}_CUSTOMER:${event.entityId}${suffix}:EMAIL:${person.email}`
       });
     }
 
     // WhatsApp goes to the internal ops list only, and only for new payments.
     for (const to of event.key === "PAYMENT_ADDED" ? rec.whatsapp : []) {
       rows.push({
-        event_key: event.key, channel: "WHATSAPP", recipient: to,
-        entity_type: "payment", entity_id: event.entityId,
+        event_key: event.key,
+        channel: "WHATSAPP",
+        recipient: to,
+        entity_type: "payment",
+        entity_id: event.entityId,
         template_name: wa.templatePayment,
         payload: {
           bodyParams: paymentWhatsAppParams(d),
@@ -148,9 +224,13 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
   // silently vanishing. Doubles as a data-quality report.
   for (const bad of rec.invalid) {
     rows.push({
-      event_key: event.key, channel: bad.channel, recipient: bad.raw,
+      event_key: event.key,
+      channel: bad.channel,
+      recipient: bad.raw,
       entity_type: event.key === "BOOKING_SUBMITTED" ? "booking" : "payment",
-      entity_id: event.entityId, status: "SKIPPED", provider: "none",
+      entity_id: event.entityId,
+      status: "SKIPPED",
+      provider: "none",
       error_code: bad.channel === "EMAIL" ? "INVALID_EMAIL" : "INVALID_PHONE",
       error_message: bad.reason,
       dedupe_key: `${event.key}:${event.entityId}:${bad.channel}:${bad.raw}`
@@ -190,5 +270,55 @@ export async function dispatchOutbound(event: OutboundEvent) {
     await enqueueOutbound(event);
   } catch (e) {
     console.error("[outbound] enqueue threw", e);
+  }
+}
+
+/**
+ * Send one already-rendered email to one address, outside the event taxonomy.
+ *
+ * Used by the security alerter, which addresses named Directors rather than a
+ * configured recipient list and must not be affected by the recipient cache.
+ */
+export async function enqueueDirectEmail(input: {
+  eventKey: string;
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  entityType: string;
+  entityId: string;
+  dedupeKey: string;
+  threadKey?: string;
+}): Promise<boolean> {
+  if (!isEmail(input.to)) return false;
+  try {
+    const admin = createSupabaseAdmin();
+    const { data, error } = await admin
+      .from("notification_deliveries")
+      .upsert(
+        [
+          {
+            event_key: input.eventKey,
+            channel: "EMAIL",
+            recipient: input.to.toLowerCase(),
+            entity_type: input.entityType,
+            entity_id: input.entityId,
+            subject: input.subject,
+            payload: { html: input.html, text: input.text, threadKey: input.threadKey },
+            dedupe_key: input.dedupeKey
+          }
+        ],
+        { onConflict: "dedupe_key", ignoreDuplicates: true }
+      )
+      .select("id");
+    if (error) {
+      console.error("[outbound] direct enqueue failed", error.message);
+      return false;
+    }
+    if (data?.length) kickDeliveryWorker();
+    return Boolean(data?.length);
+  } catch (e) {
+    console.error("[outbound] direct enqueue threw", e);
+    return false;
   }
 }

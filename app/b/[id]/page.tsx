@@ -71,16 +71,27 @@ export default async function PublicBookingPage({ params }: { params: Promise<{ 
               </div>
             </div>
 
+            {(b.bank_name || b.loan_sanctioned) && (
+              <div className="card p-5">
+                <h3 className="mb-4 text-sm font-semibold text-slate-900">Financial</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Stat label="Total value" value={formatINR(b.total_property_value)} />
+                  <Stat label="Total paid" value={formatINR(b.total_amount_paid)} tone="emerald" />
+                  <Stat label="Remaining" value={formatINR(b.remaining_balance)} tone="amber" />
+                </div>
+              </div>
+            )}
+
             {(b.bank_name || b.bank_account_number || b.loan_sanctioned) && (
               <div className="card p-5">
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">Bank details</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <Info label="Bank" value={b.bank_name ?? "—"} />
-                  <Info label="Branch" value={b.bank_branch ?? "—"} />
                   <Info label="Account holder" value={b.bank_account_holder ?? "—"} />
                   <Info label="Account number" value={maskAccount(b.bank_account_number)} />
-                  <Info label="IFSC" value={b.bank_ifsc ?? "—"} />
-                  <Info label="Home loan" value={b.loan_sanctioned ? `Sanctioned${b.loan_amount ? " · " + formatINR(b.loan_amount) : ""}` : "Not sanctioned"} />
+                  {b.loan_sanctioned ? (
+                    <Info label="Home loan" value={b.loan_sanctioned ? `Sanctioned${b.loan_amount ? " · " + formatINR(b.loan_amount) : ""}` : "Not sanctioned"} />
+                  ) : null}
                 </div>
               </div>
             )}

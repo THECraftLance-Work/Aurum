@@ -31,7 +31,9 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
       .from("ticket_comments")
       .select("*, author:author_id(name, role)")
       .eq("ticket_id", t.id)
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: true })
+      // A long-running ticket thread must not turn into an unbounded read.
+      .limit(500),
     isStaff
       ? supabase.from("app_users").select("id, name, role").in("role", ["ADMIN", "DIRECTOR"]).eq("status", "APPROVED")
       : Promise.resolve({ data: [] as any[] })

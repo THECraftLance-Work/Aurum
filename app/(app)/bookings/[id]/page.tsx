@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
+import { reportMissedRecordAccess } from "@/lib/security/access-alert";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -9,7 +10,9 @@ import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
 import AddBookingCustomer from "@/components/bookings/AddBookingCustomer";
-import EditBookingButton from "@/components/bookings/EditBookingButton";
+import InlineBookingEditor from "@/components/bookings/InlineBookingEditor";
+import { BookingEditProvider } from "@/components/bookings/BookingEditProvider";
+import HeaderEditControls from "@/components/bookings/HeaderEditControls";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import ClickableRow from "@/components/ui/ClickableRow";
 
@@ -29,7 +32,18 @@ export default async function BookingDetail({
     .select("*, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, occupation, organization, designation)")
     .eq("id", id)
     .maybeSingle();
-  if (!b) notFound();
+  if (!b) {
+    // RLS returned nothing. That is either a booking that does not exist or
+    // one belonging to another employee — only the second is a security event,
+    // so this checks which before alerting the Directors.
+    await reportMissedRecordAccess({
+      table: "bookings",
+      recordId: id,
+      actor: user,
+      path: `/bookings/${id}`
+    });
+    notFound();
+  }
 
   // PostgREST types an embedded to-one relation as an array. (The old
   // select("*") was untyped `any`, which is why this only surfaced once the
@@ -88,8 +102,34 @@ export default async function BookingDetail({
       : (row.customer ?? null),
   }));
 
+  const editBooking = {
+    id: b.id,
+    project_name: b.project_name,
+    unit_number: b.unit_number,
+    property_details: b.property_details,
+    total_property_value: b.total_property_value,
+    notes: b.notes,
+    booking_place: b.booking_place,
+    booking_date: b.booking_date,
+    block: b.block,
+    facing: b.facing,
+    sales_representative: (b as any).sales_representative,
+    team_manager: (b as any).team_manager,
+    saleable_area: (b as any).saleable_area,
+    carpet_area: (b as any).carpet_area,
+    external_walls_area: (b as any).external_walls_area,
+    balcony_utility_area: (b as any).balcony_utility_area,
+    common_area: (b as any).common_area,
+    sale_consideration_per_sqft: (b as any).sale_consideration_per_sqft,
+    source_of_booking: (b as any).source_of_booking,
+    payment_source: (b as any).payment_source,
+    purchase_purpose: (b as any).purchase_purpose,
+    cp_agent_name: (b as any).cp_agent_name,
+    cp_rera_id: (b as any).cp_rera_id,
+  };
+
   return (
-    <>
+    <BookingEditProvider booking={editBooking}>
       <PageHeader
         title={b.booking_id}
         description={`${b.project_name} · Unit ${b.unit_number}`}
@@ -98,22 +138,7 @@ export default async function BookingDetail({
             <Link href="/bookings" className="btn-secondary h-10">
               Back
             </Link>
-            {canEdit && (
-              <EditBookingButton
-                booking={{
-                  id: b.id,
-                  project_name: b.project_name,
-                  unit_number: b.unit_number,
-                  property_details: b.property_details,
-                  total_property_value: b.total_property_value,
-                  notes: b.notes,
-                  booking_place: b.booking_place,
-                  booking_date: b.booking_date,
-                  block: b.block,
-                  facing: b.facing,
-                }}
-              />
-            )}
+            {canEdit && <HeaderEditControls />}
             <StatusBadge status={b.status} />
           </div>
         }
@@ -222,86 +247,7 @@ export default async function BookingDetail({
               </div>
             </div>
 
-            <div className="card p-5">
-              <h3 className="mb-4 text-sm font-semibold text-slate-900">
-                Booking form details
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <Info
-                  label="Sales representative"
-                  value={b.sales_representative ?? "—"}
-                />
-                <Info label="Team manager" value={b.team_manager ?? "—"} />
-                <Info label="Booking place" value={b.booking_place ?? "—"} />
-                <Info label="Booking date" value={b.booking_date ?? "—"} />
-                <Info label="Block" value={b.block ?? "—"} />
-                <Info label="Facing" value={b.facing ?? "—"} />
-                <Info
-                  label="Saleable area"
-                  value={b.saleable_area ? `${b.saleable_area} Sq.ft` : "—"}
-                />
-                <Info
-                  label="Carpet area"
-                  value={b.carpet_area ? `${b.carpet_area} Sq.ft` : "—"}
-                />
-                <Info
-                  label="External walls area"
-                  value={
-                    b.external_walls_area
-                      ? `${b.external_walls_area} Sq.ft`
-                      : "—"
-                  }
-                />
-                <Info
-                  label="Balcony & utility area"
-                  value={
-                    b.balcony_utility_area
-                      ? `${b.balcony_utility_area} Sq.ft`
-                      : "—"
-                  }
-                />
-                <Info
-                  label="Common area"
-                  value={b.common_area ? `${b.common_area} Sq.ft` : "—"}
-                />
-                <Info
-                  label="Sale consideration / Sq.ft"
-                  value={
-                    b.sale_consideration_per_sqft
-                      ? formatINR(b.sale_consideration_per_sqft)
-                      : "—"
-                  }
-                />
-                <Info
-                  label="Source of booking"
-                  value={b.source_of_booking ?? "—"}
-                />
-                <Info label="Payment source" value={b.payment_source ?? "—"} />
-                <Info
-                  label="Purpose of purchase"
-                  value={b.purchase_purpose ?? "—"}
-                />
-                <Info
-                  label="CP / referral"
-                  value={
-                    [b.cp_agent_name, b.cp_rera_id]
-                      .filter(Boolean)
-                      .join(" · ") || "—"
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">
-                Property
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <Info label="Project" value={b.project_name} />
-                <Info label="Unit" value={b.unit_number} />
-                <Info label="Details" value={b.property_details ?? "—"} span />
-              </div>
-            </div>
+            <InlineBookingEditor booking={editBooking} />
 
             {(b.bank_name || b.bank_account_number || b.loan_sanctioned) && (
               <div className="card p-5">
@@ -519,7 +465,7 @@ export default async function BookingDetail({
           </aside>
         </div>
       </div>
-    </>
+    </BookingEditProvider>
   );
 }
 

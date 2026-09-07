@@ -12,23 +12,46 @@ export default async function HistoryPage() {
   const supabase = await createSupabaseServer();
   const own = ["SM","CP"].includes(user.role);
 
+  /**
+   * This page is a merged activity timeline, so it only ever renders the most
+   * recent slice. Each query is ordered newest-first and capped.
+   *
+   * Without the cap these three selects pulled entire tables — for a Director,
+   * every booking and every payment in the system — and then reduced them in
+   * JS to a list nobody scrolls to the bottom of. It was also silently wrong:
+   * PostgREST applies its own max-rows ceiling, so an uncapped, unordered
+   * query returned an arbitrary slice rather than the newest one, and entries
+   * went missing from the timeline as the tables grew.
+   */
+  const WINDOW = 200;
+
   const bq = own
     ? supabase.from("bookings")
         .select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason")
         .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(WINDOW)
     : supabase.from("bookings")
-        .select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason");
+        .select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason")
+        .order("created_at", { ascending: false })
+        .limit(WINDOW);
 
   const pq = own
     ? supabase.from("payments")
         .select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, booking:booking_id(booking_id)")
         .eq("submitted_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(WINDOW)
     : supabase.from("payments")
-        .select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, booking:booking_id(booking_id)");
+        .select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, booking:booking_id(booking_id)")
+        .order("created_at", { ascending: false })
+        .limit(WINDOW);
 
   const nq = supabase.from("notifications")
     .select("id, category, title, message, entity_type, entity_id, created_at, priority")
-    .eq("recipient_user_id", user.id);
+    .eq("recipient_user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(WINDOW);
 
   const [{ data: bookings }, { data: payments }, { data: notifs }] = await Promise.all([bq, pq, nq]);
 
