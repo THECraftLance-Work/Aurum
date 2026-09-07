@@ -1,4 +1,5 @@
 import { WalletIcon, Building2, Briefcase } from "lucide-react";
+import { ToastProvider } from "@/components/ui/Toast";
 export default function AuthLayout({
   children,
 }: {
@@ -62,20 +63,22 @@ export default function AuthLayout({
       </div>
 
       {/* Right side: Interactive Auth View */}
-      <div className="flex items-center justify-center p-6 sm:p-12 lg:p-16 bg-[var(--color-bg)] min-h-screen">
-        <div className="w-full max-w-md">
-          {/* Logo badge above form for high visibility */}
-          <div className="mb-20  flex justify-center lg:hidden">
-            <img
-              src="/APP_LOGO.png"
-              alt="Aurum Real Estate"
-              className="h-50 w-full object-cover"
-            />
-          </div>
+      <ToastProvider>
+        <div className="flex items-center justify-center p-6 sm:p-12 lg:p-16 bg-[var(--color-bg)] min-h-screen">
+          <div className="w-full max-w-md">
+            {/* Logo badge above form for high visibility */}
+            <div className="mb-20  flex justify-center lg:hidden">
+              <img
+                src="/APP_LOGO.png"
+                alt="Aurum Real Estate"
+                className="h-50 w-full object-cover"
+              />
+            </div>
 
-          {children}
+            {children}
+          </div>
         </div>
-      </div>
+      </ToastProvider>
     </div>
   );
 }

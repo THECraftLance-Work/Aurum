@@ -115,10 +115,12 @@ export default function ProfileClient({ profile }: { profile: any }) {
                 <input
                   className="input pl-10 bg-slate-50 text-slate-500 cursor-not-allowed"
                   disabled
-                  value={profile.employee_id || "Not assigned"}
+                  value={profile.employee_id || "—"}
+                  title={profile.employee_id ? profile.employee_id : "Not assigned yet — Director can set it in Users → View"}
                 />
                 <Building className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 pointer-events-none" />
               </div>
+              {!profile.employee_id && <p className="mt-1 text-[11px] text-slate-400">Not assigned yet — Director can set it in Users</p>}
             </div>
           </div>
 

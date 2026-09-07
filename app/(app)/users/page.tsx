@@ -5,6 +5,7 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import UserActionRow from "@/components/users/UserActionRow";
+import DeleteUserButton from "@/components/users/DeleteUserButton";
 import { formatDate, roleAccent, roleLabels } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import AddEmployeeButton from "@/components/users/AddEmployeeButton";
@@ -67,7 +68,7 @@ export default async function UsersPage() {
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/users/${u.id}`} title="Open profile (director view, Unique ID)" className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                        <Eye className="h-3.5 w-3.5" /> View
+                        <Eye className="h-3.5 w-3.5" /> 
                       </Link>
                       <UserActionRow
                         userId={u.id}
@@ -77,6 +78,7 @@ export default async function UsersPage() {
                         isSelf={isSelf}
                         isDirector={isDirector}
                       />
+                      {isDirector && !isSelf && <DeleteUserButton userId={u.id} userName={u.name} />}
                     </div>
                   </td>
                 </tr>

@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import PremiumLoader from "@/components/ui/PremiumLoader";
@@ -8,12 +8,22 @@ import PremiumLoader from "@/components/ui/PremiumLoader";
 export default function LoginForm() {
   const supabase = createSupabaseBrowser();
   const router = useRouter();
+  const search = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+
+  useEffect(() => {
+    if (search.get("revoked") === "1") {
+      setError("Your account has been revoked by the director please contact support.");
+    }
+    if (search.get("error") === "account_exists") {
+      setError("An account with this email already exists. Please sign in with email and password instead of Google.");
+    }
+  }, [search]);
 
   async function google() {
     setBusy(true);

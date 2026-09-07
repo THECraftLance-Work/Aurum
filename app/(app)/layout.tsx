@@ -1,9 +1,18 @@
-import { requireUser } from "@/lib/auth/session";
+import { getAuthUserWithProfile } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
+  const { profile, revoked } = await getAuthUserWithProfile();
+  if (revoked) {
+    const supabase = await createSupabaseServer();
+    await supabase.auth.signOut();
+    redirect("/login?revoked=1");
+  }
+  if (!profile) redirect("/login");
+  if (profile.status !== "APPROVED") redirect("/pending");
+  const user = profile;
 
   /**
    * Count of payments awaiting verification, surfaced as a pulsing badge on the

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { revokedResponse } from "@/lib/auth/session";
 import { notifyRole, writeAudit } from "@/lib/utils/notifications";
 import { dispatchOutbound } from "@/lib/integrations/outbound";
 import { resolveBookingContacts } from "@/lib/integrations/contacts";
@@ -12,7 +13,8 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: profile } = await supabase.from("app_users").select("id, role, status, name").eq("id", user.id).maybeSingle();
-  if (!profile || profile.status !== "APPROVED") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!profile) return revokedResponse();
+  if (profile.status !== "APPROVED") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!["SM", "CP", "ADMIN", "DIRECTOR"].includes(profile.role)) {
     return NextResponse.json({ error: "Role not permitted." }, { status: 403 });
   }

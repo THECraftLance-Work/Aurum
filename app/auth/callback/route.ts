@@ -13,10 +13,27 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", request.url));
 
-  // Upsert profile for Google users
+  // Upsert profile for Google users — prevent duplicate when EMAIL account already exists
   const admin = createSupabaseAdmin();
-  const { data: existing } = await admin
-    .from("app_users").select("id, status").eq("id", user.id).maybeSingle();
+  const { data: byId } = await admin
+    .from("app_users").select("id, status, email").eq("id", user.id).maybeSingle();
+
+  // If this Google email already has an EMAIL account (director-created), don't create duplicate.
+  // Supabase may have created a new auth user with same email but different id — detect by email.
+  const { data: byEmail } = await admin
+    .from("app_users").select("id, status, email, role").eq("email", user.email!.toLowerCase()).maybeSingle();
+
+  if (byEmail && byEmail.id !== user.id) {
+    // Duplicate email — the EMAIL account already exists. Remove the just-created Google auth user
+    // and tell the user to sign in with the original method.
+    await admin.auth.admin.deleteUser(user.id);
+    const supabase = await createSupabaseServer();
+    await supabase.auth.signOut();
+    const target = byEmail.status === "APPROVED" ? "/login?error=account_exists" : "/pending";
+    return NextResponse.redirect(new URL(target, request.url));
+  }
+
+  const existing = byId;
 
   if (!existing) {
     await admin.from("app_users").insert({

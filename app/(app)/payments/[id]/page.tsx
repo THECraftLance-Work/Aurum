@@ -31,11 +31,11 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
   const user = await requireUser();
   const supabase = await createSupabaseServer();
 
-  const { data: p } = await supabase
+  let { data: p } = await supabase
     .from("payments")
     .select(`
       *,
-      booking:booking_id(id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, remaining_balance, customer:customer_id(name, phone, email)),
+      booking:booking_id(id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, remaining_balance, created_by, customer:customer_id(name, phone, email)),
       submitted_by,
       reviewed_by
     `)
@@ -43,15 +43,32 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
     .maybeSingle();
 
   if (!p) {
-    // See the same guard on the booking detail page — distinguish a missing
-    // payment from one that belongs to a colleague before alerting.
-    await reportMissedRecordAccess({
-      table: "payments",
-      recordId: id,
-      actor: user,
-      path: `/payments/${id}`
-    });
-    notFound();
+    // SM sees 3 payments in booking detail (via admin) but RLS hides the 3rd (submitted_by=Director)
+    // yet booking is theirs. Re-read with admin: if booking's created_by matches user, allow via admin
+    // instead of 404 — this fixes "SM sees 3rd entry but gets 404 on open" from your screenshot.
+    const adminCheck = createSupabaseAdmin();
+    const { data: adminP } = await adminCheck
+      .from("payments")
+      .select(`
+        *,
+        booking:booking_id(id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, remaining_balance, created_by, customer:customer_id(name, phone, email)),
+        submitted_by,
+        reviewed_by
+      `)
+      .eq("id", id)
+      .maybeSingle();
+    const bAny: any = adminP ? (Array.isArray((adminP as any).booking) ? (adminP as any).booking[0] : (adminP as any).booking) : null;
+    if (adminP && bAny?.created_by === user.id) {
+      p = adminP as any;
+    } else {
+      await reportMissedRecordAccess({
+        table: "payments",
+        recordId: id,
+        actor: user,
+        path: `/payments/${id}`
+      });
+      notFound();
+    }
   }
 
   const booking: any = Array.isArray(p.booking) ? p.booking[0] : p.booking;

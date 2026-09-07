@@ -443,14 +443,15 @@ export function buildPaymentEmail(d: PaymentAlertData) {
 export function buildWelcomeEmail(userName: string, userEmail: string, userRole: string) {
   const href = appUrl();
   return {
-    subject: `Your ${BRAND.product} account is ready`,
+    subject: `Your account has been created in AURUM`,
     ...renderEmail({
-      preheader: `Your account has been created with the ${userRole} role.`,
+      preheader: `Your AURUM account is ready — ${userRole} access. Sign in with email + password or Google.`,
       eyebrow: "Account created",
-      heading: `Welcome to ${BRAND.product}`,
+      heading: `Your account has been created in AURUM`,
       greeting: `Hello ${firstName(userName)},`,
       intro: [
-        `An account has been created for you on ${BRAND.product}, the internal workspace for managing bookings, payments and verification.`
+        `Your account on ${BRAND.name} (${BRAND.product}) has been created by your Director. You can sign in immediately.`,
+        `Use your work email and the temporary password shared with you, or Continue with Google if your email is a Google Workspace account.`
       ],
       sections: [
         {
@@ -462,15 +463,15 @@ export function buildWelcomeEmail(userName: string, userEmail: string, userRole:
           ]
         }
       ],
-      cta: { href, label: "Sign in to the platform" },
+      cta: { href, label: "Sign in to AURUM" },
       callout: {
         tone: "warning",
         title: "Keep this account to yourself",
         text: "Bookings and customer documents on this platform are confidential. Never share your sign-in details, and sign out on shared devices."
       },
-      outro: ["If you were not expecting this, please contact your administrator immediately."],
+      outro: ["If you were not expecting this, please contact your Director immediately."],
       footerReason:
-        "You are receiving this because an administrator created an account for this address.",
+        "You are receiving this because a Director created an account for this address in AURUM.",
       signoff: `— ${BRAND.name}`
     })
   };
