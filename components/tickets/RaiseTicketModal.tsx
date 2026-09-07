@@ -122,6 +122,7 @@ export default function RaiseTicketModal({ open, onClose }: { open: boolean; onC
               maxLength={160}
               disabled={busy}
             />
+            <p className="mt-1.5 text-[11px] text-slate-500">Type at least 3 characters to process your request.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -150,7 +151,10 @@ export default function RaiseTicketModal({ open, onClose }: { open: boolean; onC
               maxLength={5000}
               disabled={busy}
             />
-            <div className="mt-1 text-right text-[11px] text-slate-400">{description.length}/5000</div>
+            <div className="mt-1 flex items-center justify-between">
+              <p className="text-[11px] text-slate-500">Type at least 3 characters to process your request.</p>
+              <span className="text-[11px] text-slate-400">{description.length}/5000</span>
+            </div>
           </div>
 
           <div className="rounded-xl border border-border bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
