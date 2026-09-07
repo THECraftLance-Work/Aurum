@@ -98,29 +98,12 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {(user.role === "ADMIN" || user.role === "DIRECTOR") && (
-        <section className="dashboard-section mt-6">
-          <div className="card p-5">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">{user.role === "DIRECTOR" ? "Organization control" : "Operations control"}</h3>
-                <p className="mt-1 text-xs text-slate-500">{user.role === "DIRECTOR" ? "Manage access, people, and organization oversight." : "Manage verification, support, and daily platform operations."}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(user.role === "DIRECTOR"
-                  ? [["/approvals", "User approvals"], ["/users", "Employees"], ["/audit", "Audit logs"]]
-                  : [["/verification", "Verification"], ["/tickets", "Support"], ["/audit", "Audit logs"]]
-                ).map(([href, label]) => <Link key={href} href={href} className="btn-secondary h-9 text-xs">{label}<ArrowRight className="h-3.5 w-3.5" /></Link>)}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+
 
       {/* items-start: each card sizes to its own content. Without it the grid
           stretches every item to the tallest in the row, so a long Payment
           activity list left a large void under Recent bookings. */}
-      <section className="dashboard-section mt-6 grid min-w-0 items-start gap-4 sm:pb-0 mb:pb-14 xl:grid-cols-3 xl:pb-0">
+      <section className="dashboard-section mt-6 grid min-w-0 items-start gap-4 xl:grid-cols-3">
         <div className="card min-w-0 overflow-hidden p-0 xl:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Recent bookings</h3>
@@ -129,7 +112,7 @@ export default async function DashboardPage() {
           {bookings.length === 0 ? (
             <EmptyState title="No bookings yet" description="Create a new booking to see it here." />
           ) : (
-            <div className="max-h-[320px] overflow-auto">
+            <div className="max-h-[55vh] overflow-y-auto overscroll-contain">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[130px]" />
@@ -181,7 +164,7 @@ export default async function DashboardPage() {
           {recentPayments.length === 0 ? (
             <EmptyState title="No payments" description="Payments will appear here." />
           ) : (
-            <ul className="max-h-[400px] divide-y divide-border overflow-y-auto">
+            <ul className="max-h-[50vh] divide-y divide-border overflow-y-auto overscroll-contain">
               {recentPayments.map((p: any) => (
                 <li key={p.id}>
                   <Link href={`/payments/${p.id}`} className="block px-5 py-3.5 transition-colors hover:bg-slate-50">

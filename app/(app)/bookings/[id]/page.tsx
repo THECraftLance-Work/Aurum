@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { reportMissedRecordAccess } from "@/lib/security/access-alert";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
@@ -52,11 +53,14 @@ export default async function BookingDetail({
     ? (b.customer[0] ?? null)
     : (b.customer ?? null);
 
-  // These two have no dependency on each other, so run them together rather
-  // than paying two sequential round-trips.
+  // After ownership verified via RLS, read related rows with admin to show
+  // SM the same payments/history the director sees. RLS would hide payments
+  // submitted_by others and audit_logs (ADMIN/DIRECTOR only), causing the
+  // "updated amount but not who updated" mismatch in your screenshots.
+  const admin = createSupabaseAdmin();
   const [{ data: payments }, { data: history }, { data: bookingCustomers }] =
     await Promise.all([
-      supabase
+      admin
         .from("payments")
         .select(
           "id, amount, payment_date, payment_mode, status, reference_no, submitted_by, reviewed_by",
@@ -64,14 +68,14 @@ export default async function BookingDetail({
         .eq("booking_id", b.id)
         .order("created_at", { ascending: false })
         .limit(100),
-      supabase
+      admin
         .from("audit_logs")
         .select("id, action, reason, created_at, actor_user_id")
         .eq("entity_type", "booking")
         .eq("entity_id", b.id)
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase
+      admin
         .from("booking_customers")
         .select(
           "id, is_primary, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, aadhaar_number, occupation, organization, designation)",
@@ -130,23 +134,24 @@ export default async function BookingDetail({
 
   return (
     <BookingEditProvider booking={editBooking}>
-      <PageHeader
-        title={b.booking_id}
-        description={`${b.project_name} · Unit ${b.unit_number}`}
-        actions={
-          <div className="flex items-center gap-2">
-            <Link href="/bookings" className="btn-secondary h-10">
-              Back
-            </Link>
-            {canEdit && <HeaderEditControls />}
-            <StatusBadge status={b.status} />
-          </div>
-        }
-      />
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 xl:-mx-8 border-b border-slate-200 bg-[#f8fafc]/95 px-3 sm:px-6 xl:px-8 py-0 backdrop-blur shrink-0">
+        <PageHeader
+          title={b.booking_id}
+          description={`${b.project_name} · Unit ${b.unit_number}`}
+          actions={
+            <div className="flex items-center gap-2">
+              <Link href="/bookings" className="btn-secondary h-10">
+                Back
+              </Link>
+              {canEdit && <HeaderEditControls />}
+              <StatusBadge status={b.status} />
+            </div>
+          }
+        />
+      </div>
 
-      <div className="h-[calc(100vh-175px)] overflow-y-auto overscroll-contain pb-24 pr-1">
-        <div className="grid items-start gap-4 xl:grid-cols-3">
-          <div className="xl:col-span-2 space-y-4">
+      <div className="grid gap-4 xl:grid-cols-3 items-start xl:h-[calc(100vh-160px)] xl:overflow-hidden pt-2">
+        <div className="xl:col-span-2 space-y-4 xl:h-[calc(100vh-160px)] xl:overflow-y-auto xl:overscroll-contain xl:pr-2 pb-24 xl:pb-6">
             <div className="card p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-slate-900">
@@ -421,7 +426,23 @@ export default async function BookingDetail({
             </div>
           </div>
 
-          <aside className="space-y-4 self-start xl:sticky xl:top-0 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:overscroll-contain">
+          <aside className="space-y-4 self-start xl:h-[calc(100vh-100px)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1 pb-24">
+            
+
+            {canReview && <ReviewActions bookingId={b.id} />}
+
+            {canAddPayment && (
+              <div className="card p-5">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                  Add payment
+                </h3>
+                <AddPaymentForm
+                  bookingId={b.id}
+                  maxAmount={b.remaining_balance}
+                  totalPaid={b.total_amount_paid}
+                />
+              </div>
+            )}
             <div className="card p-5">
               <h3 className="text-sm font-semibold text-slate-900">
                 Submission
@@ -447,24 +468,8 @@ export default async function BookingDetail({
                 )}
               </dl>
             </div>
-
-            {canReview && <ReviewActions bookingId={b.id} />}
-
-            {canAddPayment && (
-              <div className="card p-5">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                  Add payment
-                </h3>
-                <AddPaymentForm
-                  bookingId={b.id}
-                  maxAmount={b.remaining_balance}
-                  totalPaid={b.total_amount_paid}
-                />
-              </div>
-            )}
           </aside>
         </div>
-      </div>
     </BookingEditProvider>
   );
 }

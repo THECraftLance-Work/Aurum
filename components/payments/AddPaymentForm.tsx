@@ -145,7 +145,7 @@ export default function AddPaymentForm({
           </div>
         )}
 
-        <div className="sticky bottom-0 -mx-1 flex gap-2 bg-white/95 px-1 pb-1 pt-3 backdrop-blur">
+        <div className="flex gap-2 pt-3">
           <button type="button" onClick={() => setStep("entry")} disabled={busy} className="btn-secondary h-10 flex-1">
             <ArrowLeft className="h-3.5 w-3.5" /> Edit
           </button>
@@ -225,7 +225,7 @@ export default function AddPaymentForm({
         </div>
       )}
 
-      <div className="sticky bottom-0 -mx-1 bg-white/95 px-1 pb-1 pt-3 backdrop-blur">
+      <div className="pt-3">
         <button type="submit" className="btn-primary h-10 w-full" disabled={busy || !valid}>
           Review payment
         </button>

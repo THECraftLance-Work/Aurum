@@ -1,13 +1,19 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import PremiumLoader from "@/components/ui/PremiumLoader";
 
 export default function LoginForm() {
   const supabase = createSupabaseBrowser();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
 
   async function google() {
     setBusy(true);
@@ -25,6 +31,22 @@ export default function LoginForm() {
     }
   }
 
+  async function passwordLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setLoadingMessage("Signing in...");
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) {
+      setBusy(false);
+      setLoadingMessage(null);
+      setError(error.message);
+      return;
+    }
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <>
       {busy && loadingMessage && (
@@ -35,6 +57,15 @@ export default function LoginForm() {
       )}
 
       <div className="space-y-4">
+        {/* Director-created EMAIL accounts sign in here; Google remains for Workspace */}
+        <form onSubmit={passwordLogin} className="space-y-3">
+          <label className="block"><span className="label">Work email</span><input className="input" type="email" required value={email} onChange={e => setEmail(e.target.value)} /></label>
+          <label className="block"><span className="label">Password</span><div className="relative"><input className="input pr-10" required type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} /><button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 text-slate-500" tabIndex={-1}>{showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></label>
+          <button type="submit" disabled={busy} className="btn-primary w-full h-10">Sign in</button>
+        </form>
+
+        <div className="flex items-center gap-3 py-1"><div className="h-px flex-1 bg-slate-200" /><span className="text-xs text-slate-500">or</span><div className="h-px flex-1 bg-slate-200" /></div>
+
         <button
           type="button"
           onClick={google}

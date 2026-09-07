@@ -686,12 +686,17 @@ export default function NewBookingForm({ role }: { role: string }) {
               bold
             />
           </div>
-          {!valid && validation.message && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+          {!valid && validation.message ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700">
               <p className="font-semibold">Please correct the following before submitting:</p>
               <p className="mt-1 break-words">{validation.message}</p>
+              <p className="mt-2 text-[11px] text-slate-500">Correct format: Full name ≥2 letters, Email as name@domain.com, PAN ABCDE1234F, Aadhaar 12 digits, PIN 6 digits, Phone 10 digits.</p>
             </div>
-          )}
+          ) : valid ? (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+              ✓ All required fields correctly formatted — ready to submit.
+            </div>
+          ) : null}
           {error && (
             <div className="mt-4 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">
               {error}
