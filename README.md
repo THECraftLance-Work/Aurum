@@ -1,13 +1,13 @@
 # Aurum Operations Platform
 
 ## Purpose
-
+ 
 Aurum is the internal operations workspace for managing real-estate bookings,
 customer records, payment proofs, verification decisions, notifications, and
 audit history. It is intended for approved employees only and is not a public
 customer portal.
 
-## Product Areas
+## Product Area
 
 - Dashboard: role-aware operational metrics and recent activity
 - Bookings: customer, property, bank, financial, referral, and document data
