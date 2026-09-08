@@ -27,7 +27,11 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   const { customer, customers, booking, initialPayment, previousPayments, attachment, project_id: bodyProjectId } = body ?? {};
   const jar = await cookies();
-  const projectId = (bodyProjectId as string | undefined) ?? jar.get("srivaraha_project")?.value ?? null;
+  const selectedProjectId = jar.get("srivaraha_project")?.value?.trim() || null;
+  const projectId = selectedProjectId ?? (bodyProjectId as string | undefined) ?? null;
+  if (selectedProjectId && bodyProjectId && bodyProjectId !== selectedProjectId) {
+    return NextResponse.json({ error: "Booking project must match the selected workspace." }, { status: 400 });
+  }
   // If no project selected, default to Aurum for backward compat, or require selection for new data
   let effectiveProjectId: string | null = projectId;
   if (!effectiveProjectId) {
@@ -46,7 +50,9 @@ export async function POST(req: Request) {
   if (invalidCustomer && !invalidCustomer.success) return NextResponse.json({ error: validationMessage(invalidCustomer) }, { status: 400 });
   const totalValue = Number(booking.total_property_value);
   const previous = Number(previousPayments ?? 0);
-  const current = Number(initialPayment?.amount ?? 0);
+  const current = booking.payment_plan === "ONE_TIME_PAYMENT"
+    ? Math.max(0, totalValue - previous)
+    : Number(initialPayment?.amount ?? 0);
   const bookingResult = bookingSchema.safeParse({
     ...booking,
     previous_payments: previous,
@@ -184,9 +190,11 @@ export async function POST(req: Request) {
     await admin.from("payments").insert({
       booking_id: bk.id,
       amount: current,
-      payment_date: initialPayment.payment_date,
-      payment_mode: initialPayment.payment_mode,
-      reference_no: initialPayment.reference_no,
+      payment_date: initialPayment?.payment_date ?? new Date().toISOString().slice(0, 10),
+      payment_mode: initialPayment?.payment_mode ?? "OTHER",
+      reference_no: booking.payment_plan === "ONE_TIME_PAYMENT"
+        ? (initialPayment?.reference_no || "ONE_TIME")
+        : (initialPayment?.reference_no ?? null),
       status: "PENDING",
       submitted_by: profile.id,
       project_id: effectiveProjectId

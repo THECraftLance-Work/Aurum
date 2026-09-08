@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { SessionUser } from "@/lib/auth/session";
 import { cn } from "@/lib/utils/cn";
 import { roleAccent, roleLabels } from "@/lib/utils/format";
+import PremiumLoader from "@/components/ui/PremiumLoader";
 import {
   LayoutDashboard, ClipboardList, Wallet, Inbox, BarChart3,
   ShieldCheck, UserCog, Users, ScrollText, Settings, X, History, Building2, User, LifeBuoy, MoreHorizontal, ChevronUp, ChevronDown
@@ -43,6 +44,8 @@ export default function Sidebar({
   const [projects, setProjects] = useState<any[]>([]);
   const [currentProject, setCurrentProject] = useState<string>("");
   const [projectOpen, setProjectOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [confirmProject, setConfirmProject] = useState<any | null>(null);
   const refreshProject = () => {
     const c = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1];
     const val = c ? decodeURIComponent(c) : (typeof window !== "undefined" ? localStorage.getItem("srivaraha_project") ?? "" : "");
@@ -58,6 +61,14 @@ export default function Sidebar({
     return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("srivaraha:project", onCustom as any); };
   }, []);
   function selectProject(id: string) {
+    const project = projects.find((item: any) => item.id === id);
+    if (!project || id === currentProject) return;
+    setConfirmProject(project);
+  }
+  function confirmSwitch() {
+    const id = confirmProject?.id as string | undefined;
+    if (!id) return;
+    setConfirmProject(null);
     document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=31536000`;
     document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
     localStorage.setItem("srivaraha_project", id);
@@ -66,7 +77,10 @@ export default function Sidebar({
     setProjectOpen(false);
     window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: id }));
     window.dispatchEvent(new StorageEvent("storage", { key: "srivaraha_project", newValue: id } as any));
-    router.refresh();
+    startTransition(() => {
+      router.push("/dashboard");
+      router.refresh();
+    });
   }
   const parentProject = projects.find((p: any) => p.slug === "sri-varaha");
   const subProjects = projects.filter((p: any) => p.slug !== "sri-varaha");
@@ -79,7 +93,25 @@ export default function Sidebar({
   const moreItems = items.slice(4);
 
   const content = (
-    <div className="flex h-full w-72 flex-col bg-white border-r border-border">
+    <div className="relative flex h-full w-72 flex-col bg-white border-r border-border">
+      {isPending && (
+        <PremiumLoader message="Loading project dashboard..." submessage="Fetching secure project data" />
+      )}
+      {confirmProject && (
+        <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <h2 className="text-base font-semibold text-slate-900">Switch project?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Are you sure you want to switch to <strong>{confirmProject.name}</strong>?
+              The dashboard, bookings, and payments will update to this project.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmProject(null)} className="btn-secondary h-10">Cancel</button>
+              <button type="button" onClick={confirmSwitch} className="btn-primary h-10">Yes, switch</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between px-2 py-5 gap-2">
         <div className="relative flex-1">
           <button onClick={()=> setProjectOpen(v=>!v)} className="flex w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-900 px-3 py-2.5 text-left hover:bg-slate-800 transition-colors">

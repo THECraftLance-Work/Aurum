@@ -19,6 +19,7 @@ import CollapsibleCard from "@/components/ui/CollapsibleCard";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import ClickableRow from "@/components/ui/ClickableRow";
 import BookingStatementPdfButton from "@/components/bookings/BookingStatementPdfButton";
+import { getProjectScopeIds } from "@/lib/utils/projectScope";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,9 @@ export default async function BookingDetail({
 
   const { data: b } = await supabase
     .from("bookings")
-    .select("*, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, occupation, organization, designation)")
+    .select(
+      "*, customer:customer_id(title, name, father_spouse_name, date_of_birth, address, city, state, country, pin_code, phone, alternate_phone, email, alternate_email, pan_number, occupation, organization, designation)",
+    )
     .eq("id", id)
     .maybeSingle();
   if (!b) {
@@ -44,19 +47,23 @@ export default async function BookingDetail({
       table: "bookings",
       recordId: id,
       actor: user,
-      path: `/bookings/${id}`
+      path: `/bookings/${id}`,
     });
     notFound();
   }
   const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
   const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
-  // If the booking has a project_id but the cookie project differs,
-  // don't redirect — the user explicitly opened this detail page.
-  // Just continue loading; the page will show data scoped to the
-  // booking's project via its own project_id (below).
-  // Earlier redirection (project_mismatch) is only for the bookings/list pages.
-  if (projectId && (b as any).project_id && (b as any).project_id !== projectId) {
-    // removed redirect-to-list; keep page loaded for the detail view
+  if (projectId && (b as any).project_id) {
+    const allowedProjectIds = await getProjectScopeIds(supabase, projectId);
+    if (!allowedProjectIds?.includes((b as any).project_id)) {
+      await reportMissedRecordAccess({
+        table: "bookings",
+        recordId: id,
+        actor: user,
+        path: `/bookings/${id} (project_mismatch)`,
+      });
+      redirect("/bookings");
+    }
   }
 
   // PostgREST types an embedded to-one relation as an array. (The old
@@ -76,7 +83,7 @@ export default async function BookingDetail({
       admin
         .from("payments")
         .select(
-          "id, amount, payment_date, payment_mode, status, reference_no, submitted_by, reviewed_by",
+          "id, amount, payment_date, created_at, payment_mode, status, reference_no, submitted_by, reviewed_by",
         )
         .eq("booking_id", b.id)
         .order("created_at", { ascending: false })
@@ -161,12 +168,21 @@ export default async function BookingDetail({
               <BookingStatementPdfButton
                 bookingRef={b.booking_id}
                 project={b.project_name}
-                subProjectName={(b as any).block ? `BLOCK ${(b as any).block}` : (b as any).sub_project_name ?? b.project_name}
+                subProjectName={
+                  (b as any).block
+                    ? `BLOCK ${(b as any).block}`
+                    : ((b as any).sub_project_name ?? b.project_name)
+                }
                 unit={b.unit_number}
                 sft={(b as any).saleable_area ?? (b as any).carpet_area ?? ""}
                 bookingDate={(b as any).booking_date ?? b.created_at}
-                customerName={people[0]?.customer?.name ?? customer?.name ?? "Customer"}
-                coApplicantName={people.find((pe: any) => !pe.is_primary)?.customer?.name ?? null}
+                customerName={
+                  people[0]?.customer?.name ?? customer?.name ?? "Customer"
+                }
+                coApplicantName={
+                  people.find((pe: any) => !pe.is_primary)?.customer?.name ??
+                  null
+                }
                 totalValue={Number(b.total_property_value ?? 0)}
                 totalPaid={Number(b.total_amount_paid ?? 0)}
                 remaining={Number(b.remaining_balance ?? 0)}
@@ -174,9 +190,14 @@ export default async function BookingDetail({
                   no: `${idx + 322} / ${p.id.slice(0, 6)}`,
                   date: formatDate(p.payment_date),
                   mode: p.payment_mode,
-                  bankName: p.payment_mode === "BANK_TRANSFER" ? "Online Payment" : p.payment_mode,
+                  bankName:
+                    p.payment_mode === "BANK_TRANSFER"
+                      ? "Online Payment"
+                      : p.payment_mode,
                   instrumentDate: formatDate(p.payment_date),
-                  instrumentNo: p.reference_no ? `BY TRANSFER-RTGS UTR NO: ${p.reference_no}` : "BY TRANSFER-RTGS UTR NO: HD",
+                  instrumentNo: p.reference_no
+                    ? `BY TRANSFER-RTGS UTR NO: ${p.reference_no}`
+                    : "BY TRANSFER-RTGS UTR NO: HD",
                   amount: Number(p.amount ?? 0),
                   ref: p.reference_no ?? undefined,
                 }))}
@@ -188,295 +209,312 @@ export default async function BookingDetail({
         />
       </div>
 
-      <div className="relative isolate -mx-3 sm:-mx-6 xl:-mx-8 px-3 sm:px-6 xl:px-8 grid gap-4 xl:grid-cols-3 items-start pt-6">
+      <div className="relative isolate -mx-3 min-w-0 max-w-full overflow-x-hidden sm:-mx-6 xl:-mx-8 px-3 sm:px-6 xl:px-8 grid gap-4 xl:grid-cols-3 items-start pt-6">
         <div className="xl:col-span-2 space-y-4 min-w-0">
-            <CollapsibleCard title="Financial">
-              <div className="grid grid-cols-3 gap-4">
-                <Stat label="Total value" value={formatINR(b.total_property_value)} />
-                <Stat label="Total paid" value={formatINR(b.total_amount_paid)} tone="emerald" />
-                <Stat label="Remaining" value={formatINR(b.remaining_balance)} tone="amber" />
-              </div>
-            </CollapsibleCard>
+          <div className="bg-[#FFFFFF] p-5 rounded-lg flex flex-col">
+            <span className="font-semibold py-2">Financial</span>
+            <div className="grid grid-cols-3 gap-4">
+              <Stat
+                label="Total value"
+                value={formatINR(b.total_property_value)}
+              />
+              <Stat
+                label="Total paid"
+                value={formatINR(b.total_amount_paid)}
+                tone="emerald"
+              />
+              <Stat
+                label="Remaining"
+                value={formatINR(b.remaining_balance)}
+                tone="amber"
+              />
+            </div>
+          </div>
 
-            <CollapsibleCard title="Customers">
-              <div className="space-y-3">
-                {(people.length
-                  ? people
-                  : [{ id: "primary", is_primary: true, customer }]
-                ).map((person: any, index: number) => (
-                  <div
-                    key={person.id}
-                    className="rounded-xl border border-border p-4"
-                  >
-                    <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {person.is_primary || index === 0
-                        ? "Primary customer"
-                        : `Additional customer ${index + 1}`}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <Info label="Name" value={person.customer?.name ?? "—"} />
-                      <Info
-                        label="Title / relation"
-                        value={
-                          [
-                            person.customer?.title,
-                            person.customer?.father_spouse_name,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "—"
-                        }
-                      />
-                      <Info
-                        label="Phone"
-                        value={person.customer?.phone ?? "—"}
-                      />
-                      <Info
-                        label="Email"
-                        value={person.customer?.email ?? "—"}
-                      />
-                      <Info
-                        label="Date of birth"
-                        value={person.customer?.date_of_birth ?? "—"}
-                      />
-                      <Info
-                        label="Alternate contact"
-                        value={
-                          [
-                            person.customer?.alternate_phone,
-                            person.customer?.alternate_email,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "—"
-                        }
-                      />
-                      <Info
-                        label="Address"
-                        value={
-                          [
-                            person.customer?.address,
-                            person.customer?.city,
-                            person.customer?.state,
-                            person.customer?.pin_code,
-                          ]
-                            .filter(Boolean)
-                            .join(", ") || "—"
-                        }
-                        span
-                      />
-                      <Info
-                        label="PAN / Aadhaar"
-                        value={
-                          [
-                            person.customer?.pan_number,
-                            person.customer?.aadhaar_number,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "—"
-                        }
-                      />
-                      <Info
-                        label="Occupation"
-                        value={
-                          [
-                            person.customer?.occupation,
-                            person.customer?.organization,
-                            person.customer?.designation,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "—"
-                        }
-                      />
-                    </div>
+          <CollapsibleCard title="Customers">
+            <div className="space-y-3">
+              {(people.length
+                ? people
+                : [{ id: "primary", is_primary: true, customer }]
+              ).map((person: any, index: number) => (
+                <div
+                  key={person.id}
+                  className="rounded-xl border border-border p-4"
+                >
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {person.is_primary || index === 0
+                      ? "Primary customer"
+                      : `Additional customer ${index + 1}`}
                   </div>
-                ))}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <Info label="Name" value={person.customer?.name ?? "—"} />
+                    <Info
+                      label="Title / relation"
+                      value={
+                        [
+                          person.customer?.title,
+                          person.customer?.father_spouse_name,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "—"
+                      }
+                    />
+                    <Info label="Phone" value={person.customer?.phone ?? "—"} />
+                    <Info label="Email" value={person.customer?.email ?? "—"} />
+                    <Info
+                      label="Date of birth"
+                      value={person.customer?.date_of_birth ?? "—"}
+                    />
+                    <Info
+                      label="Alternate contact"
+                      value={
+                        [
+                          person.customer?.alternate_phone,
+                          person.customer?.alternate_email,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "—"
+                      }
+                    />
+                    <Info
+                      label="Address"
+                      value={
+                        [
+                          person.customer?.address,
+                          person.customer?.city,
+                          person.customer?.state,
+                          person.customer?.pin_code,
+                        ]
+                          .filter(Boolean)
+                          .join(", ") || "—"
+                      }
+                      span
+                    />
+                    <Info
+                      label="PAN / Aadhaar"
+                      value={
+                        [
+                          person.customer?.pan_number,
+                          person.customer?.aadhaar_number,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "—"
+                      }
+                    />
+                    <Info
+                      label="Occupation"
+                      value={
+                        [
+                          person.customer?.occupation,
+                          person.customer?.organization,
+                          person.customer?.designation,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "—"
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CollapsibleCard>
+
+          <InlineBookingEditor booking={editBooking} />
+
+          {(b.bank_name || b.bank_account_number || b.loan_sanctioned) && (
+            <CollapsibleCard title="Bank details">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <Info label="Bank" value={b.bank_name ?? "—"} />
+                <Info label="Branch" value={b.bank_branch ?? "—"} />
+                <Info
+                  label="Account holder"
+                  value={b.bank_account_holder ?? "—"}
+                />
+                <Info
+                  label="Account number"
+                  value={b.bank_account_number ?? "—"}
+                />
+                <Info label="IFSC" value={b.bank_ifsc ?? "—"} />
+                <Info
+                  label="Home loan"
+                  value={
+                    b.loan_sanctioned
+                      ? `Sanctioned${b.loan_amount ? " · " + formatINR(b.loan_amount) : ""}`
+                      : "Not sanctioned"
+                  }
+                />
               </div>
             </CollapsibleCard>
+          )}
 
-            <InlineBookingEditor booking={editBooking} />
-
-            {(b.bank_name || b.bank_account_number || b.loan_sanctioned) && (
-              <CollapsibleCard title="Bank details">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <Info label="Bank" value={b.bank_name ?? "—"} />
-                  <Info label="Branch" value={b.bank_branch ?? "—"} />
-                  <Info
-                    label="Account holder"
-                    value={b.bank_account_holder ?? "—"}
-                  />
-                  <Info
-                    label="Account number"
-                    value={b.bank_account_number ?? "—"}
-                  />
-                  <Info label="IFSC" value={b.bank_ifsc ?? "—"} />
-                  <Info
-                    label="Home loan"
-                    value={
-                      b.loan_sanctioned
-                        ? `Sanctioned${b.loan_amount ? " · " + formatINR(b.loan_amount) : ""}`
-                        : "Not sanctioned"
-                    }
-                  />
-                </div>
-              </CollapsibleCard>
-            )}
-
-            <CollapsibleCard title="Payment history" right={<span className="text-xs text-slate-500">{payments?.length ?? 0} entries</span>}>
-              {(payments?.length ?? 0) === 0 ? (
-                <div className="p-6 text-sm text-slate-500">
-                  No payments recorded.
-                </div>
-              ) : (
-                <div className="max-h-[232px] overflow-y-auto overflow-x-auto overscroll-contain">
-                  {/*
+          <CollapsibleCard
+            title="Payment history"
+            right={
+              <span className="text-xs text-slate-500">
+                {payments?.length ?? 0} entries
+              </span>
+            }
+          >
+            {(payments?.length ?? 0) === 0 ? (
+              <div className="p-6 text-sm text-slate-500">
+                No payments recorded.
+              </div>
+            ) : (
+              <div className="max-h-[232px] overflow-y-auto overflow-x-auto overscroll-contain">
+                {/*
                   table-fixed + colgroup: without explicit widths the review
                   buttons pushed the table past the card and clipped the last
                   column. Verification lives in the Verification Queue and on
                   the payment page — this table is a read-only ledger.
                   Capped to 4 rows (~58px each) + header so scrollbar appears after 4 entries.
                 */}
-                  <table className="w-full table-fixed text-sm">
-                    <colgroup>
-                      <col className="w-[72px]" />
-                      <col className="w-[130px]" />
-                      <col className="w-[110px]" />
-                      <col className="w-[130px]" />
-                      <col className="w-[120px]" />
-                      <col />
-                      <col className="w-[44px]" />
-                    </colgroup>
-                    <thead className="sticky top-0 z-[1] bg-slate-50 text-slate-500 text-left shadow-[0_1px_0_#e2e8f0]">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">#</th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Amount
-                        </th>
-                        <th className="px-4 py-3 font-medium">Date</th>
-                        <th className="px-4 py-3 font-medium">Mode</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Submitted by</th>
-                        <th className="px-4 py-3" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments!.map((p: any, i: number) => (
-                        <ClickableRow
-                          key={p.id}
-                          href={`/payments/${p.id}`}
-                          className="row-hover border-t border-border"
-                        >
-                          <td className="px-4 py-3">
-                            <Link
-                              href={`/payments/${p.id}`}
-                              className="font-medium text-slate-900 hover:text-accent"
-                            >
-                              #{payments!.length - i}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums font-medium">
-                            {formatINR(p.amount)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {formatDate(p.payment_date)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="cell-truncate text-slate-600">
-                              {p.payment_mode.replaceAll("_", " ")}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge status={p.status} />
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="cell-truncate text-slate-600">
-                              {displayUser(dir, p.submitted_by)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">
-                            <ChevronRight className="h-4 w-4" />
-                          </td>
-                        </ClickableRow>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CollapsibleCard>
+                <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    <col className="w-[72px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[120px]" />
+                    <col />
+                    <col className="w-[44px]" />
+                  </colgroup>
+                  <thead className="sticky top-0 z-[1] bg-slate-50 text-slate-500 text-left shadow-[0_1px_0_#e2e8f0]">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">#</th>
+                      <th className="px-4 py-3 font-medium text-right">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 font-medium">Payment date</th>
+                      <th className="px-4 py-3 font-medium">Added</th>
+                      <th className="px-4 py-3 font-medium">Mode</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Submitted by</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments!.map((p: any, i: number) => (
+                      <ClickableRow
+                        key={p.id}
+                        href={`/payments/${p.id}`}
+                        className="row-hover border-t border-border"
+                      >
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/payments/${p.id}`}
+                            className="font-medium text-slate-900 hover:text-accent"
+                          >
+                            #{payments!.length - i}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">
+                          {formatINR(p.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatDate(p.payment_date)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatDateTime(p.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="cell-truncate text-slate-600">
+                            {p.payment_mode.replaceAll("_", " ")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={p.status} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="cell-truncate text-slate-600">
+                            {displayUser(dir, p.submitted_by)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          <ChevronRight className="h-4 w-4" />
+                        </td>
+                      </ClickableRow>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CollapsibleCard>
 
-            <CollapsibleCard title="History">
-              {(history?.length ?? 0) === 0 ? (
-                <div className="text-sm text-slate-500">No activity yet.</div>
-              ) : (
-                <ol className="space-y-3">
-                  {history!.map((h: any) => (
-                    <li key={h.id} className="flex gap-3">
-                      <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
-                      <div className="text-sm">
-                        <div className="text-slate-900">
-                          <span className="font-medium">
-                            {h.actor_user_id
-                              ? displayUser(dir, h.actor_user_id)
-                              : "System"}
-                          </span>{" "}
-                          · {h.action.replaceAll("_", " ").toLowerCase()}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {formatDateTime(h.created_at)}
-                          {h.reason ? ` · ${h.reason}` : ""}
-                        </div>
+          <CollapsibleCard title="History">
+            {(history?.length ?? 0) === 0 ? (
+              <div className="text-sm text-slate-500">No activity yet.</div>
+            ) : (
+              <ol className="space-y-3">
+                {history!.map((h: any) => (
+                  <li key={h.id} className="flex gap-3">
+                    <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+                    <div className="text-sm">
+                      <div className="text-slate-900">
+                        <span className="font-medium">
+                          {h.actor_user_id
+                            ? displayUser(dir, h.actor_user_id)
+                            : "System"}
+                        </span>{" "}
+                        · {h.action.replaceAll("_", " ").toLowerCase()}
                       </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </CollapsibleCard>
+                      <div className="text-xs text-slate-500">
+                        {formatDateTime(h.created_at)}
+                        {h.reason ? ` · ${h.reason}` : ""}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </CollapsibleCard>
+        </div>
+
+        <aside className="space-y-4 self-start min-w-0 pb-8 xl:sticky xl:top-[84px]">
+          {canAddPayment && (
+            <div className="rounded-xl border border-border bg-white">
+              <div className="px-4 py-3 font-semibold text-slate-900">
+                Add payment
+              </div>
+              <div className="p-4">
+                <AddPaymentForm
+                  bookingId={b.id}
+                  maxAmount={b.remaining_balance}
+                  totalPaid={b.total_amount_paid}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-border bg-white">
+            <div className="px-4 py-3 font-semibold text-slate-900">
+              Submission
+            </div>
+            <div className="p-4">
+              <dl className="space-y-2 text-sm">
+                <Info
+                  label="Submitted by"
+                  value={displayUser(dir, b.created_by, { withRole: true })}
+                />
+                <Info
+                  label="Submitted at"
+                  value={formatDateTime(b.submitted_at)}
+                />
+                <Info
+                  label="Last updated"
+                  value={formatDateTime(b.updated_at)}
+                />
+
+                {b.rejection_reason && (
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">
+                    <div className="font-medium">Rejection reason</div>
+                    <div>{b.rejection_reason}</div>
+                  </div>
+                )}
+              </dl>
+            </div>
           </div>
-
-          <aside className="space-y-4 self-start min-w-0 pb-8 xl:sticky xl:top-[84px]">
-           {canAddPayment && (
-  <div className="rounded-xl border border-border bg-white">
-    <div className="px-4 py-3 font-semibold text-slate-900">
-      Add payment
-    </div>
-    <div className="p-4">
-      <AddPaymentForm
-        bookingId={b.id}
-        maxAmount={b.remaining_balance}
-        totalPaid={b.total_amount_paid}
-      />
-    </div>
-  </div>
-)}
-
-<div className="rounded-xl border border-border bg-white">
-  <div className="px-4 py-3 font-semibold text-slate-900">
-    Submission
-  </div>
-  <div className="p-4">
-    <dl className="space-y-2 text-sm">
-      <Info
-        label="Submitted by"
-        value={displayUser(dir, b.created_by, { withRole: true })}
-      />
-      <Info
-        label="Submitted at"
-        value={formatDateTime(b.submitted_at)}
-      />
-      <Info
-        label="Last updated"
-        value={formatDateTime(b.updated_at)}
-      />
-
-      {b.rejection_reason && (
-        <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">
-          <div className="font-medium">Rejection reason</div>
-          <div>{b.rejection_reason}</div>
-        </div>
-      )}
-    </dl>
-  </div>
-</div>
-          </aside>
-        </div>
+        </aside>
+      </div>
     </BookingEditProvider>
   );
 }
@@ -517,7 +555,10 @@ function Stat({
   return (
     <div className="rounded-xl border border-border p-4 overflow-hidden">
       <div className="text-xs text-slate-500 truncate">{label}</div>
-      <div className={`mt-1 text-lg sm:text-xl font-semibold tabular-nums truncate whitespace-nowrap ${c}`} title={value}>
+      <div
+        className={`mt-1 text-lg sm:text-xl font-semibold tabular-nums truncate whitespace-nowrap ${c}`}
+        title={value}
+      >
         {value}
       </div>
     </div>

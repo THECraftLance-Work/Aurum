@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatINR } from "@/lib/utils/format";
+import { formatINR, localDateInputValue } from "@/lib/utils/format";
 import { AlertCircle, CheckCircle2, Clock, ArrowLeft, ShieldCheck } from "lucide-react";
 import FileUpload, { type UploadedFile } from "@/components/ui/FileUpload";
 
@@ -19,7 +19,7 @@ export default function AddPaymentForm({
 }) {
   const router = useRouter();
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateInputValue());
   const [mode, setMode] = useState("BANK_TRANSFER");
   const [ref, setRef] = useState("");
   const [file, setFile] = useState<UploadedFile | null>(null);

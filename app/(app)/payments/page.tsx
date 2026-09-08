@@ -6,7 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import EmptyState from "@/components/ui/EmptyState";
 import Tooltip from "@/components/ui/Tooltip";
-import { formatDate, formatINR } from "@/lib/utils/format";
+import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import { ChevronRight } from "lucide-react";
@@ -51,11 +51,18 @@ export default async function PaymentsPage({
   let q = supabase
     .from("payments")
     .select(
-      "id, amount, payment_date, payment_mode, status, booking_id, submitted_by, project_id, reference_no, booking:booking_id(booking_id, project_name, total_property_value)",
+      "id, amount, payment_date, created_at, payment_mode, status, booking_id, submitted_by, project_id, reference_no, booking:booking_id(booking_id, project_name, total_property_value)",
       { count: "exact" },
     )
-    .order("created_at", { ascending: false })
-    .range(from, from + PAGE_SIZE - 1);
+    .order("created_at", { ascending: false });
+  if (!filters.plan || filters.plan === "all") {
+    q = q.range(from, from + PAGE_SIZE - 1);
+  } else {
+    // Plan classification uses the booking total, so it cannot be expressed
+    // as a reliable PostgREST predicate. Fetch the scoped set, classify it,
+    // then paginate the filtered result instead of filtering one page only.
+    q = q.limit(1000);
+  }
 
   if (["SM", "CP"].includes(user.role)) q = q.eq("submitted_by", user.id);
   if (tab.statuses.length) q = q.in("status", tab.statuses);
@@ -71,7 +78,7 @@ export default async function PaymentsPage({
   const { data: rawPayments, count } = await q;
 
   // Filter by payment plan (One-Time vs Installment) if selected
-  const payments = (rawPayments ?? []).filter((p: any) => {
+  const filteredPayments = (rawPayments ?? []).filter((p: any) => {
     if (!filters.plan || filters.plan === "all") return true;
     const isOneTime = Number(p.amount) >= Number(p.booking?.total_property_value ?? 0) || p.reference_no === "ONE_TIME" || p.reference_no === "FULL_PAYMENT";
     if (filters.plan === "one_time") return isOneTime;
@@ -79,7 +86,10 @@ export default async function PaymentsPage({
     return true;
   });
 
-  const total = count ?? 0;
+  const payments = filters.plan && filters.plan !== "all"
+    ? filteredPayments.slice(from, from + PAGE_SIZE)
+    : filteredPayments;
+  const total = filters.plan && filters.plan !== "all" ? filteredPayments.length : (count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const dir = await resolveDirectory(
     (payments ?? []).map((p: any) => p.submitted_by),
@@ -156,18 +166,18 @@ export default async function PaymentsPage({
                   <col className="w-[140px]" />
                   <col className="w-[120px]" />
                   <col className="w-[140px]" />
-                  <col className="w-[150px]" />
+                  <col className="w-[160px]" />
                   <col className="w-[140px]" />
                   <col className="w-[44px]" />
                 </colgroup>
 
-                <thead className="bg-slate-50 text-left text-slate-500">
+                <thead className="bg-slate-50 text-center   text-slate-500">
                   <tr>
-                    <th className="whitespace-nowrap px-5 py-3 font-medium">
+                    <th className="whitespace-nowrap text-right  px-5 py-3 font-medium">
                       Booking
                     </th>
 
-                    <th className="px-5 py-3 font-medium">Project</th>
+                    <th className="px-5 py-3 text-left font-medium">Project</th>
 
                     <th className="px-5 py-3 text-right font-medium">Amount</th>
 
@@ -224,12 +234,15 @@ export default async function PaymentsPage({
                           {formatINR(p.amount)}
                         </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">
-                          {formatDate(p.payment_date)}
+                        <td className="px-5 py-3 text-slate-600">
+                          <span className="block whitespace-nowrap">{formatDate(p.payment_date)}</span>
+                          <span className="mt-0.5 block whitespace-nowrap text-xs text-slate-400">
+                            Added {formatDateTime(p.created_at)}
+                          </span>
                         </td>
 
-                        <td className="px-4 py-5 text-slate-600">
-                          <span className="capitalize">
+                        <td className="min-w-0 px-4 py-5 text-slate-600">
+                          <span className="cell-truncate block whitespace-nowrap capitalize">
                             {p.payment_mode.replaceAll("_", " ")}
                           </span>
                         </td>
@@ -275,7 +288,7 @@ export default async function PaymentsPage({
                           {bk?.booking_id ?? "—"}
                         </div>
                         <div className="truncate text-xs text-slate-500">
-                          {formatDate(p.payment_date)} ·{" "}
+                          {formatDate(p.payment_date)} · Added {formatDateTime(p.created_at)} ·{" "}
                           {p.payment_mode.replaceAll("_", " ")}
                         </div>
                         <div className="mt-1">

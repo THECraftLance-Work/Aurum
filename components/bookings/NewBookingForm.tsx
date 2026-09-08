@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatINR } from "@/lib/utils/format";
+import { formatINR, localDateInputValue } from "@/lib/utils/format";
 import FileUpload, { type UploadedFile } from "@/components/ui/FileUpload";
 import { bookingSchema, customerSchema, validationMessage } from "@/lib/validation/booking";
 
@@ -51,7 +51,7 @@ export default function NewBookingForm({ role }: { role: string }) {
     payment_plan: "INSTALLMENT_PLAN",
     previous_payments: "0",
     current_payment: "",
-    payment_date: new Date().toISOString().slice(0, 10),
+    payment_date: localDateInputValue(),
     payment_mode: "BANK_TRANSFER",
     reference_no: "",
     notes: "",
@@ -65,7 +65,7 @@ export default function NewBookingForm({ role }: { role: string }) {
     sales_representative: "",
     team_manager: "",
     booking_place: "",
-    booking_date: new Date().toISOString().slice(0, 10),
+    booking_date: localDateInputValue(),
     block: "",
     facing: "",
     saleable_area: "",
@@ -102,11 +102,9 @@ export default function NewBookingForm({ role }: { role: string }) {
         if (overwrite) return defaultVal !== undefined && defaultVal !== null ? String(defaultVal) : "";
         return currentVal || (defaultVal !== undefined && defaultVal !== null ? String(defaultVal) : "");
       };
-      const totalVal = getVal(f.total_property_value, proj.default_sale_consideration);
       const next = {
         ...f,
         project_name: proj.name,
-        total_property_value: totalVal,
         saleable_area: getVal(f.saleable_area, areas.saleable_area),
         carpet_area: getVal(f.carpet_area, areas.carpet_area),
         external_walls_area: getVal(f.external_walls_area, areas.external_walls_area),
@@ -124,9 +122,9 @@ export default function NewBookingForm({ role }: { role: string }) {
           areas.sale_consideration_per_sqft ?? proj.default_sale_consideration
         ),
       };
-      if (next.payment_plan === "ONE_TIME_PAYMENT" && totalVal) {
+      if (next.payment_plan === "ONE_TIME_PAYMENT" && next.total_property_value) {
         const prev = Number(next.previous_payments || 0);
-        next.current_payment = String(Math.max(0, Number(totalVal) - prev));
+        next.current_payment = String(Math.max(0, Number(next.total_property_value) - prev));
       }
       return next;
     });
@@ -260,6 +258,7 @@ export default function NewBookingForm({ role }: { role: string }) {
         booking: {
           project_name: form.project_name.trim(),
           unit_number: form.unit_number.trim(),
+          payment_plan: form.payment_plan,
           property_details: form.property_details.trim() || null,
           total_property_value: total,
           notes: form.notes.trim() || null,

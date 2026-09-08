@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { X, CheckCheck, Inbox, Trash2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
@@ -42,6 +42,7 @@ export default function NotificationsDrawer({
   user, open, onClose
 }: { user: SessionUser; open: boolean; onClose: () => void }) {
   const supabase = createSupabaseBrowser();
+  const router = useRouter();
   const { toast } = useToast();
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(false);
@@ -100,6 +101,12 @@ export default function NotificationsDrawer({
   async function markOne(id: string) {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+  }
+
+  function openNotification(n: Notif, href: string) {
+    void markOne(n.id);
+    onClose();
+    router.push(href);
   }
 
   /** Optimistic delete. `.select()` returns the deleted rows — an empty result
@@ -196,7 +203,7 @@ export default function NotificationsDrawer({
                     n.priority === "URGENT" || n.priority === "HIGH" ? "bg-[#ec3013]" : "bg-blue-500",
                     n.is_read && "opacity-25"
                   )} />
-                  <button onClick={() => markOne(n.id)} className="min-w-0 flex-1 text-left">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-sm font-medium text-slate-900">{n.title}</div>
                       <div className="shrink-0 text-[11px] text-slate-500">{formatDateTime(n.created_at)}</div>
@@ -205,10 +212,16 @@ export default function NotificationsDrawer({
                     <div className="mt-1.5 flex items-center gap-2">
                       <span className="badge bg-slate-100 text-slate-600">{n.category}</span>
                       {href && (
-                        <Link href={href} className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">Open <ArrowRight className="h-3 w-3" /></Link>
+                        <button
+                          type="button"
+                          onClick={() => openNotification(n, href)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                        >
+                          Open <ArrowRight className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
-                  </button>
+                  </div>
                   <button
                     onClick={() => clearOne(n)}
                     className="rounded-lg p-1.5 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100"

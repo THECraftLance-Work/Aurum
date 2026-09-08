@@ -13,6 +13,7 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
     setProjectsList(projects);
   }, [projects]);
   const [current, setCurrent] = useState<string | null>(null);
+  const [confirmProject, setConfirmProject] = useState<any | null>(null);
   const [name, setName] = useState(""); const [slug, setSlug] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
   const [editSale, setEditSale] = useState("");
@@ -40,6 +41,14 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
     return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("srivaraha:project", onCustom as any); };
   }, []);
   function select(id: string) {
+    const project = projectsList.find((item: any) => item.id === id);
+    if (!project || id === current) return;
+    setConfirmProject(project);
+  }
+  function confirmSelect() {
+    const id = confirmProject?.id as string | undefined;
+    if (!id) return;
+    setConfirmProject(null);
     document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=315360000`;
     document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
     localStorage.setItem("srivaraha_project", id);
@@ -166,6 +175,23 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
         </div>
       )}
 
+      {mounted && confirmProject && createPortal(
+        <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <h2 className="text-base font-semibold text-slate-900">Switch project?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Are you sure you want to switch to <strong>{confirmProject.name}</strong>?
+              The dashboard, bookings, and payments will update to this project.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmProject(null)} className="btn-secondary h-10">Cancel</button>
+              <button type="button" onClick={confirmSelect} className="btn-primary h-10">Yes, switch</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {mounted && editing && createPortal(
         <div className="fixed inset-0 z-[100] flex justify-end bg-slate-900/40 backdrop-blur-sm">
           <button className="absolute inset-0" onClick={()=> setEditing(null)} aria-label="Close" />
@@ -179,7 +205,7 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div>
-                <label className="label">Default sale consideration (₹)</label>
+                <label className="label">Default sale consideration / sqft (₹)</label>
                 <input className="input" type="number" value={editSale} onChange={e=> setEditSale(e.target.value)} placeholder="e.g. 5000000" />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -204,7 +230,7 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-slate-500">These defaults prefill New Booking → Sale consideration & areas when this project is selected — just like the New Booking form fields.</p>
+              <p className="text-xs text-slate-500">These defaults prefill New Booking → Sale consideration / sqft and area fields. Total property value must be entered separately for each booking.</p>
             </div>
             <div className="flex justify-end gap-2 border-t p-4 bg-slate-50">
               <button onClick={()=> setEditing(null)} className="btn-secondary">Cancel</button>

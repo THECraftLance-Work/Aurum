@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { revokedResponse } from "@/lib/auth/session";
@@ -25,10 +26,14 @@ export async function POST(req: Request) {
   const admin = createSupabaseAdmin();
   const { data: bk } = await admin
     .from("bookings")
-    .select("id, booking_id, created_by, remaining_balance, total_amount_paid, total_property_value, project_id, customer:customer_id(name, email)")
+    .select("id, booking_id, created_by, remaining_balance, total_amount_paid, total_property_value, project_id, project_name, unit_number, customer:customer_id(name, email)")
     .eq("id", booking_id)
     .maybeSingle();
   if (!bk) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  const selectedProjectId = (await cookies()).get("srivaraha_project")?.value?.trim() || null;
+  if (selectedProjectId && (bk as any).project_id !== selectedProjectId) {
+    return NextResponse.json({ error: "Booking is outside the selected project." }, { status: 404 });
+  }
 
   /**
    * Ownership gate.
@@ -129,6 +134,9 @@ export async function POST(req: Request) {
     data: {
       bookingRef: bk.booking_id,
       bookingUuid: bk.id,
+      project: (bk as any).project_name,
+      unit: (bk as any).unit_number,
+      totalValue: Number((bk as any).total_property_value ?? 0),
       submitterName: profile.name,
       customerName: (bk as any).customer?.name ?? "—",
       customerEmail: (bk as any).customer?.email ?? null,

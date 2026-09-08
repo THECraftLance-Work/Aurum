@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendNotification, writeAudit } from "@/lib/utils/notifications";
@@ -19,8 +20,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (decision === "REJECTED" && !reason) return NextResponse.json({ error: "Reason required" }, { status: 400 });
 
   const admin = createSupabaseAdmin();
-  const { data: bk } = await admin.from("bookings").select("id, booking_id, created_by, status").eq("id", id).maybeSingle();
+  const { data: bk } = await admin.from("bookings").select("id, booking_id, created_by, status, project_id").eq("id", id).maybeSingle();
   if (!bk) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const selectedProjectId = (await cookies()).get("srivaraha_project")?.value?.trim() || null;
+  if (selectedProjectId && bk.project_id !== selectedProjectId) {
+    return NextResponse.json({ error: "Booking is outside the selected project." }, { status: 404 });
+  }
 
   await admin.from("bookings").update({
     status: decision,

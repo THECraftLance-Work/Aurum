@@ -121,7 +121,7 @@ export async function buildBookingStatementPdf(d: BookingStatementData): Promise
   // ── Meta info bordered table (6 rows) ──
   const metaRows: [string, string][] = [
     ["Project Name:", sanitize(d.project)],
-    ["Sub Project Name:", sanitize(d.subProjectName ?? (d as any).block ? `BLOCK ${(d as any).block}` : "—")],
+    ["Sub Project Name:", sanitize(d.subProjectName ?? ((d as any).block ? `BLOCK ${(d as any).block}` : "—"))],
     ["Unit No:", `${sanitize(d.unit)}, Sft:${sanitize(String(d.sft ?? "")) || "-"}, Booking Date:${d.bookingDate ? new Date(d.bookingDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-"}`],
     ["Customer Name:", sanitize(d.customerName)],
     ["Co-Applicant Name:", sanitize(d.coApplicantName ?? "—")],

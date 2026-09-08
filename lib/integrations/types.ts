@@ -29,6 +29,8 @@ export type BookingAlertData = {
 export type PaymentAlertData = {
   bookingRef: string;
   bookingUuid: string;
+  project: string;
+  unit: string;
   submitterName: string;
   customerName: string;
   /** Primary customer address. See `contacts` for the full fan-out list. */

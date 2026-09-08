@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -48,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const admin = createSupabaseAdmin();
   const { data: pay } = await admin
     .from("payments")
-    .select("id, amount, status, payment_mode, reference_no, payment_date, submitted_by, booking_id, booking:booking_id(id, booking_id, total_property_value, total_amount_paid, customer:customer_id(name, email))")
+    .select("id, amount, status, payment_mode, reference_no, payment_date, submitted_by, booking_id, project_id, booking:booking_id(id, booking_id, project_id, project_name, unit_number, total_property_value, total_amount_paid, customer:customer_id(name, email))")
     .eq("id", id)
     .maybeSingle();
 
@@ -63,6 +64,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const booking: any = Array.isArray(pay.booking) ? pay.booking[0] : pay.booking;
+  const selectedProjectId = (await cookies()).get("srivaraha_project")?.value?.trim() || null;
+  if (selectedProjectId && (pay as any).project_id !== selectedProjectId) {
+    return NextResponse.json({ error: "Payment is outside the selected project." }, { status: 404 });
+  }
 
   // Approving must not push total paid past the property value. The recalc
   // trigger has no such guard, so it is enforced here.
@@ -200,6 +205,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: {
       bookingRef: booking?.booking_id ?? "",
       bookingUuid: booking?.id ?? pay.booking_id,
+      project: booking?.project_name ?? "Project",
+      unit: booking?.unit_number ?? "",
       submitterName: profile.name,
       customerName: cust?.name ?? "—",
       customerEmail: cust?.email ?? null,

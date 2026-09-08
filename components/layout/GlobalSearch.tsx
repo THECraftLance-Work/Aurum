@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowRight, CalendarPlus, CreditCard, FileText, LayoutDashboard, Search, UserRound, UsersRound, X } from "lucide-react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import type { SessionUser } from "@/lib/auth/session";
+import PremiumLoader from "@/components/ui/PremiumLoader";
 
 type Result = { kind: "project" | "booking" | "customer" | "user"; id: string; title: string; subtitle?: string; href: string; projectId?: string };
 type Action = { label: string; description: string; href: string; icon: typeof LayoutDashboard; roles: SessionUser["role"][]; shortcut?: string };
@@ -23,6 +24,7 @@ const labels: Record<Result["kind"], string> = { project: "Projects", booking: "
 
 export default function GlobalSearch({ user }: { user: SessionUser }) {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createSupabaseBrowser();
   const inputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -30,6 +32,8 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [confirmProject, setConfirmProject] = useState<Result | null>(null);
   const [active, setActive] = useState(0);
 
   const filteredActions = useMemo(() => {
@@ -71,17 +75,27 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
       setLoading(true);
       const term = query.trim().replace(/[%,()\\.]/g, " ");
       const pid = getProjectId();
-      let bq: any = supabase.from("bookings").select("id, booking_id, project_name, unit_number, project_id").or(`booking_id.ilike.%${term}%,project_name.ilike.%${term}%,unit_number.ilike.%${term}%`).limit(6);
+      let bq: any = supabase.from("bookings").select("id, booking_id, project_name, unit_number, project_id, customer_id").or(`booking_id.ilike.%${term}%,project_name.ilike.%${term}%,unit_number.ilike.%${term}%`).limit(6);
       if (pid) bq = bq.eq("project_id", pid);
       const [projects, bookings, customers, users] = await Promise.all([
         supabase.from("projects").select("id, name, slug, parent_id").eq("is_active", true).or(`name.ilike.%${term}%,slug.ilike.%${term}%`).limit(4),
         bq,
-        supabase.from("customers").select("id, name, phone, email").or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`).limit(6),
+        supabase.from("customers").select("id, name, phone, email").or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`).limit(20),
         ["ADMIN", "DIRECTOR"].includes(user.role)
           ? supabase.from("app_users").select("id, name, email, role").or(`name.ilike.%${term}%,email.ilike.%${term}%`).limit(6)
           : Promise.resolve({ data: [] as any[] }),
       ]);
       if (cancelled) return;
+      let customerRows = customers.data ?? [];
+      if (pid && customerRows.length) {
+        const { data: links } = await supabase
+          .from("booking_customers")
+          .select("customer_id, booking:bookings!inner(project_id)")
+          .eq("booking.project_id", pid)
+          .in("customer_id", customerRows.map((c: any) => c.id));
+        const allowed = new Set((links ?? []).map((link: any) => link.customer_id));
+        customerRows = customerRows.filter((customer: any) => allowed.has(customer.id));
+      }
       const next: Result[] = [];
       projects.data?.filter((p: any) => p.slug !== "sri-varaha").forEach((p: any) => next.push({
         kind: "project",
@@ -92,7 +106,7 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
         projectId: p.id
       }));
       bookings.data?.forEach((b: any) => next.push({ kind: "booking", id: b.id, title: `${b.booking_id} · ${b.project_name}`, subtitle: `Unit ${b.unit_number}`, href: `/bookings/${b.id}` }));
-      customers.data?.forEach((c: any) => next.push({ kind: "customer", id: c.id, title: c.name, subtitle: [c.phone, c.email].filter(Boolean).join(" · "), href: `/bookings?customer=${c.id}` }));
+      customerRows.forEach((c: any) => next.push({ kind: "customer", id: c.id, title: c.name, subtitle: [c.phone, c.email].filter(Boolean).join(" · "), href: `/bookings?customer=${c.id}` }));
       users.data?.forEach((u: any) => next.push({ kind: "user", id: u.id, title: u.name, subtitle: `${u.role} · ${u.email}`, href: `/users?focus=${u.id}` }));
       setResults(next); setLoading(false);
     }, 240);
@@ -100,17 +114,28 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
   }, [query, supabase, open, user.role]);
 
   function close() { setOpen(false); setQuery(""); }
-  function go(item: Result | Action | string) {
-    if (typeof item === "object" && "kind" in item && item.kind === "project" && item.projectId) {
-      document.cookie = `srivaraha_project=${encodeURIComponent(item.projectId)}; path=/; max-age=31536000`;
-      document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
-      localStorage.setItem("srivaraha_project", item.projectId);
-      window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: item.projectId }));
-      close();
+  function confirmProjectSwitch() {
+    const projectId = confirmProject?.projectId;
+    if (!projectId) return;
+    const project = confirmProject;
+    setConfirmProject(null);
+    document.cookie = `srivaraha_project=${encodeURIComponent(projectId)}; path=/; max-age=31536000`;
+    document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
+    localStorage.setItem("srivaraha_project", projectId);
+    window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: projectId }));
+    close();
+    startTransition(() => {
       router.push("/dashboard");
       router.refresh();
+    });
+  }
+  function go(item: Result | Action | string) {
+    if (typeof item === "object" && "kind" in item && item.kind === "project" && item.projectId) {
+      if (item.projectId === getProjectId()) return;
+      setConfirmProject(item);
       return;
     }
+
     const dest = typeof item === "string" ? item : item.href;
     close();
     router.push(dest);
@@ -123,6 +148,21 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
   const groups = (Object.keys(labels) as Result["kind"][]).map((kind) => ({ kind, items: results.filter((r) => r.kind === kind) })).filter((g) => g.items.length);
 
   return <div ref={searchRef} className="relative">
+    {isPending && (
+      <PremiumLoader message="Loading project dashboard..." submessage="Fetching secure project data" />
+    )}
+    {confirmProject && (
+      <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+          <h2 className="text-base font-semibold text-slate-900">Switch project?</h2>
+          <p className="mt-2 text-sm text-slate-600">Are you sure you want to switch to <strong>{confirmProject.title}</strong>?</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmProject(null)} className="btn-secondary h-10">Cancel</button>
+            <button type="button" onClick={confirmProjectSwitch} className="btn-primary h-10">Yes, switch</button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className={`relative transition-opacity duration-150 ${open ? "pointer-events-none opacity-0" : "opacity-100"}`}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <button type="button" onClick={() => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }} className="input flex h-10 w-full min-w-0 items-center truncate pl-9 pr-16 text-left text-sm text-slate-400" aria-label="Search bookings, customers, and users">Search bookings, customers, projects, users…</button>
