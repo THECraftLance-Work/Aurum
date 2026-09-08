@@ -6,7 +6,7 @@ export default function InlineBookingEditor({ booking }: { booking: any }) {
   const { editing, form, update, error } = useBookingEdit();
   return (
     <>
-      <CollapsibleCard title="Property" defaultOpen={true}>
+      <CollapsibleCard title="Property" defaultOpen={false}>
         {editing ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Project *" value={form.project_name} onChange={(v) => update("project_name", v)} />
@@ -26,7 +26,7 @@ export default function InlineBookingEditor({ booking }: { booking: any }) {
         )}
       </CollapsibleCard>
 
-      <CollapsibleCard title="Booking form details" defaultOpen={true}>
+      <CollapsibleCard title="Booking form details" defaultOpen={false}>
         {editing ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Sales representative" value={form.sales_representative} onChange={(v) => update("sales_representative", v)} />

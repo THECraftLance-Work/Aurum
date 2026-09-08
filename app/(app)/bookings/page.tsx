@@ -10,6 +10,7 @@ import Tooltip from "@/components/ui/Tooltip";
 import { formatDate, formatINR } from "@/lib/utils/format";
 import BookingsFilters from "@/components/bookings/BookingsFilters";
 import ClickableRow from "@/components/ui/ClickableRow";
+import { getProjectScopeIds } from "@/lib/utils/projectScope";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,11 @@ export default async function BookingsPage({
 }) {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
-  const filters = await searchParams;
-  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
+  const scopeIds = await getProjectScopeIds(supabase, projectId);
 
+  const filters = (await searchParams) ?? {};
   const page = Math.max(1, Number(filters.page ?? 1) || 1);
   const from = (page - 1) * PAGE_SIZE;
 
@@ -42,7 +45,7 @@ export default async function BookingsPage({
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
 
-  if (projectId) query = query.eq("project_id", projectId);
+  if (scopeIds) query = query.in("project_id", scopeIds);
 
   if (["SM", "CP"].includes(user.role)) query = query.eq("created_by", user.id);
   if (filters.status) query = query.eq("status", filters.status);

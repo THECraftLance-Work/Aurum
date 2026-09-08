@@ -48,6 +48,7 @@ export default function NewBookingForm({ role }: { role: string }) {
     unit_number: "",
     property_details: "",
     total_property_value: "",
+    payment_plan: "INSTALLMENT_PLAN",
     previous_payments: "0",
     current_payment: "",
     payment_date: new Date().toISOString().slice(0, 10),
@@ -89,6 +90,48 @@ export default function NewBookingForm({ role }: { role: string }) {
     purchase_purpose: "",
   });
 
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  function applyProjectDefaults(proj: any, overwrite = false) {
+    if (!proj) return;
+    setSelectedProjectId(proj.id);
+    const areas = proj.default_areas ?? {};
+    setForm((f) => {
+      const getVal = (currentVal: string, defaultVal: any) => {
+        if (overwrite) return defaultVal !== undefined && defaultVal !== null ? String(defaultVal) : "";
+        return currentVal || (defaultVal !== undefined && defaultVal !== null ? String(defaultVal) : "");
+      };
+      const totalVal = getVal(f.total_property_value, proj.default_sale_consideration);
+      const next = {
+        ...f,
+        project_name: proj.name,
+        total_property_value: totalVal,
+        saleable_area: getVal(f.saleable_area, areas.saleable_area),
+        carpet_area: getVal(f.carpet_area, areas.carpet_area),
+        external_walls_area: getVal(f.external_walls_area, areas.external_walls_area),
+        balcony_utility_area: getVal(f.balcony_utility_area, areas.balcony_utility_area),
+        common_area: getVal(f.common_area, areas.common_area),
+        base_price: getVal(f.base_price, areas.base_price),
+        floor_rise_charges: getVal(f.floor_rise_charges, areas.floor_rise_charges),
+        east_facing_charges: getVal(f.east_facing_charges, areas.east_facing_charges),
+        premium_view_charges: getVal(f.premium_view_charges, areas.premium_view_charges),
+        amenities_charges: getVal(f.amenities_charges, areas.amenities_charges),
+        car_parking_charges: getVal(f.car_parking_charges, areas.car_parking_charges),
+        legal_documentation_charges: getVal(f.legal_documentation_charges, areas.legal_documentation_charges),
+        sale_consideration_per_sqft: getVal(
+          f.sale_consideration_per_sqft,
+          areas.sale_consideration_per_sqft ?? proj.default_sale_consideration
+        ),
+      };
+      if (next.payment_plan === "ONE_TIME_PAYMENT" && totalVal) {
+        const prev = Number(next.previous_payments || 0);
+        next.current_payment = String(Math.max(0, Number(totalVal) - prev));
+      }
+      return next;
+    });
+  }
+
   const draftKey = "new-booking-draft";
   useEffect(() => {
     try {
@@ -98,26 +141,25 @@ export default function NewBookingForm({ role }: { role: string }) {
       setSaveData(localStorage.getItem("new-booking-save-data") === "on");
     } catch { /* Browser storage is optional. */ }
     setDraftReady(true);
-    // Prefill Sale consideration & areas from admin defaults for current project
+
+    // Fetch active projects and prefill defaults for current workspace project
     try {
-      const pid = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)![1]) : localStorage.getItem("srivaraha_project");
-      if (pid) {
-        fetch("/api/projects").then(r=>r.json()).then(j=>{
-          const proj = (j.projects ?? []).find((p:any)=> p.id===pid);
-          if (proj) {
-            const areas = proj.default_areas ?? {};
-            setForm(f=> ({
-              ...f,
-              saleable_area: f.saleable_area || (areas.saleable_area ? String(areas.saleable_area) : f.saleable_area),
-              carpet_area: f.carpet_area || (areas.carpet_area ? String(areas.carpet_area) : f.carpet_area),
-              external_walls_area: f.external_walls_area || (areas.external_walls_area ? String(areas.external_walls_area) : f.external_walls_area),
-              balcony_utility_area: f.balcony_utility_area || (areas.balcony_utility_area ? String(areas.balcony_utility_area) : f.balcony_utility_area),
-              common_area: f.common_area || (areas.common_area ? String(areas.common_area) : f.common_area),
-              sale_consideration_per_sqft: f.sale_consideration_per_sqft || (proj.default_sale_consideration ? String(proj.default_sale_consideration) : f.sale_consideration_per_sqft),
-            }));
+      fetch("/api/projects")
+        .then((r) => r.json())
+        .then((j) => {
+          const list = j.projects ?? [];
+          setProjects(list);
+          const pid = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1]
+            ? decodeURIComponent(document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)![1])
+            : localStorage.getItem("srivaraha_project");
+          if (pid) {
+            const currentProj = list.find((p: any) => p.id === pid);
+            if (currentProj) {
+              applyProjectDefaults(currentProj, false);
+            }
           }
-        }).catch(()=>{});
-      }
+        })
+        .catch(() => {});
     } catch {}
   }, []);
 
@@ -138,7 +180,23 @@ export default function NewBookingForm({ role }: { role: string }) {
   }
 
   function upd<K extends keyof typeof form>(k: K, v: string) {
-    setForm((f) => ({ ...f, [k]: v }));
+    setForm((f) => {
+      const next = { ...f, [k]: v };
+      if (k === "payment_plan" && v === "ONE_TIME_PAYMENT") {
+        const tot = Number(f.total_property_value || 0);
+        const prev = Number(f.previous_payments || 0);
+        next.current_payment = String(Math.max(0, tot - prev));
+      } else if (k === "total_property_value" && f.payment_plan === "ONE_TIME_PAYMENT") {
+        const tot = Number(v || 0);
+        const prev = Number(f.previous_payments || 0);
+        next.current_payment = String(Math.max(0, tot - prev));
+      } else if (k === "previous_payments" && f.payment_plan === "ONE_TIME_PAYMENT") {
+        const tot = Number(f.total_property_value || 0);
+        const prev = Number(v || 0);
+        next.current_payment = String(Math.max(0, tot - prev));
+      }
+      return next;
+    });
   }
   function updCustomer(
     index: number,
@@ -174,7 +232,15 @@ export default function NewBookingForm({ role }: { role: string }) {
     if (!validation.valid) { setError(validation.message); return; }
     setBusy(true);
     setError(null);
-    const project_id = typeof document !== "undefined" ? (document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)![1]) : localStorage.getItem("srivaraha_project")) : null;
+    const project_id =
+      selectedProjectId ||
+      (typeof document !== "undefined"
+        ? document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1]
+          ? decodeURIComponent(
+              document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)![1]
+            )
+          : localStorage.getItem("srivaraha_project")
+        : null);
     const res = await fetch("/api/bookings", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -250,7 +316,9 @@ export default function NewBookingForm({ role }: { role: string }) {
                 amount: current,
                 payment_date: form.payment_date,
                 payment_mode: form.payment_mode,
-                reference_no: form.reference_no.trim() || null,
+                reference_no: form.payment_plan === "ONE_TIME_PAYMENT"
+                  ? (form.reference_no.trim() ? `${form.reference_no.trim()} · ONE_TIME` : "ONE_TIME")
+                  : (form.reference_no.trim() || null),
               }
             : null,
         previousPayments: previous,
@@ -459,11 +527,39 @@ export default function NewBookingForm({ role }: { role: string }) {
               onChange={(v) => upd("booking_date", v)}
               type="date"
             />
-            <Field
-              label="Project / property name *"
-              v={form.project_name}
-              onChange={(v) => upd("project_name", v)}
-            />
+            {projects.length > 0 ? (
+              <label className="block">
+                <span className="label">Project / property name *</span>
+                <select
+                  className="input"
+                  value={form.project_name}
+                  onChange={(e) => {
+                    const pName = e.target.value;
+                    const selectedProj = projects.find(
+                      (p) => p.name.toLowerCase() === pName.toLowerCase()
+                    );
+                    if (selectedProj) {
+                      applyProjectDefaults(selectedProj, true);
+                    } else {
+                      upd("project_name", pName);
+                    }
+                  }}
+                >
+                  <option value="">Select project</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name} {p.slug === "sri-varaha" ? "(Parent)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <Field
+                label="Project / property name *"
+                v={form.project_name}
+                onChange={(v) => upd("project_name", v)}
+              />
+            )}
             <Field
               label="Unit / flat number *"
               v={form.unit_number}
@@ -636,6 +732,12 @@ export default function NewBookingForm({ role }: { role: string }) {
               type="number"
               min={0}
               step={1}
+            />
+            <Select
+              label="Payment schedule / plan"
+              v={form.payment_plan}
+              onChange={(v) => upd("payment_plan", v)}
+              options={["INSTALLMENT_PLAN", "ONE_TIME_PAYMENT"]}
             />
             <Field
               label="Previous payments (₹)"

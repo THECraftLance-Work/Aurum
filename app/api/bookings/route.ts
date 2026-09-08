@@ -174,7 +174,8 @@ export async function POST(req: Request) {
       submitted_by: profile.id,
       reviewed_by: profile.id,
       reviewed_at: new Date().toISOString(),
-      notes: "Migrated / previous payments"
+      notes: "Migrated / previous payments",
+      project_id: effectiveProjectId
     });
   }
 
@@ -187,7 +188,8 @@ export async function POST(req: Request) {
       payment_mode: initialPayment.payment_mode,
       reference_no: initialPayment.reference_no,
       status: "PENDING",
-      submitted_by: profile.id
+      submitted_by: profile.id,
+      project_id: effectiveProjectId
     });
   }
 
@@ -209,9 +211,7 @@ export async function POST(req: Request) {
     if (attErr) console.error("[bookings] attachment link failed", attErr.message);
   }
 
-  // 5. Notify accountants
-  // These independent side effects run together so the redirect is not held
-  // up by three sequential network/database operations.
+  // 5. Notify accountants — project-scoped so inbox/notifications filter correctly per Tatva/Aurum
   await Promise.all([
     notifyRole("ACCOUNTANT", {
       category: "BOOKING",
@@ -219,7 +219,8 @@ export async function POST(req: Request) {
       message: `${profile.name} submitted booking ${bk.booking_id} for verification.`,
       entityType: "booking",
       entityId: bk.id,
-      priority: "HIGH"
+      priority: "HIGH",
+      projectId: effectiveProjectId
     }),
     writeAudit({
       actorUserId: profile.id,

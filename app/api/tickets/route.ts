@@ -33,6 +33,14 @@ export async function POST(req: Request) {
   const b = parsed.data;
 
   const admin = createSupabaseAdmin();
+  // Resolve current project for isolation — defaults to Aurum if no cookie (handles missing website case)
+  const { cookies } = await import("next/headers");
+  const rawProj = (await cookies()).get("srivaraha_project")?.value ?? null;
+  let ticketProjectId: string | null = rawProj && rawProj.trim() ? rawProj.trim() : null;
+  if (!ticketProjectId) {
+    const { data: aurum } = await admin.from("projects").select("id").eq("slug", "aurum").eq("is_active", true).maybeSingle();
+    ticketProjectId = aurum?.id ?? null;
+  }
 
   // Idempotency guard against double-submit (same pattern as /api/payments).
   const cutoff = new Date(Date.now() - 15_000).toISOString();
@@ -52,7 +60,8 @@ export async function POST(req: Request) {
     page_path: b.page_path ?? null,
     user_agent: b.user_agent ?? null,
     related_entity_type: b.related_entity_type ?? null,
-    related_entity_id: b.related_entity_id ?? null
+    related_entity_id: b.related_entity_id ?? null,
+    project_id: ticketProjectId
   }).select("id, ticket_number").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -63,7 +72,8 @@ export async function POST(req: Request) {
     message: `${profile.name} raised ${t.ticket_number}: ${b.subject}`,
     entityType: "ticket",
     entityId: t.id,
-    priority: b.priority
+    priority: b.priority,
+    projectId: ticketProjectId
   });
 
   // Only escalate to Directors for URGENT, otherwise they get flooded by
@@ -75,7 +85,8 @@ export async function POST(req: Request) {
       message: `${profile.name} raised ${t.ticket_number}: ${b.subject}`,
       entityType: "ticket",
       entityId: t.id,
-      priority: "URGENT"
+      priority: "URGENT",
+      projectId: ticketProjectId
     });
   }
 
@@ -87,7 +98,8 @@ export async function POST(req: Request) {
     message: `Your ticket ${t.ticket_number} has been raised. Support will review it.`,
     entityType: "ticket",
     entityId: t.id,
-    priority: "NORMAL"
+    priority: "NORMAL",
+    projectId: ticketProjectId
   });
 
   await writeAudit({

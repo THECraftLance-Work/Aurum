@@ -36,6 +36,13 @@ function setAuthCookie(response: NextRequest, name: string, value: string, optio
 }
 
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const hasOnboarded = request.cookies.get("srivaraha_onboarded")?.value === "1";
+  const hasValidProject = Boolean(request.cookies.get("srivaraha_project")?.value);
+  const isProjectPage = path === "/projects" || path.startsWith("/projects/");
+  const isApiOrAuth = path.startsWith("/api/") || path === "/login" || path === "/register";
+  const isRootOrDashboard = path === "/" || path === "/dashboard" || path.startsWith("/dashboard/");
+
   // Fast path: without an auth cookie there is no session to refresh, so skip
   // the auth.getUser() network round-trip entirely (login/register/cold hits).
   const hasAuthCookie = request.cookies
@@ -71,46 +78,53 @@ export async function updateSession(request: NextRequest) {
   );
   const { data: { user } } = await supabase.auth.getUser();
 
-  // First-login project picker: show only once. After user picks once we set
-  // srivaraha_onboarded=1 (10y). Subsequent logins must not force the picker.
-  // ADMIN/DIRECTOR are allowed All Projects (no cookie).
+  // Project scoping: per-user assigned project (set by Admin/Director in user panel).
+  // If a user has an assigned_project_id, they are auto-redirected to that project
+  // on every login without seeing the project picker. Otherwise we fall back to the
+  // existing Aurum‑default logic (see below).
   if (user) {
-    const hasProject = request.cookies.has("srivaraha_project");
-    const rawVal = request.cookies.get("srivaraha_project")?.value ?? "";
-    const hasValidProject = hasProject && rawVal.trim() !== "";
-    const hasOnboarded = request.cookies.has("srivaraha_onboarded");
-    const path = request.nextUrl.pathname;
-    const isProjectPage = path.startsWith("/srivaraha") || path === "/projects" || path.startsWith("/projects/");
-    const isApiOrAuth = path.startsWith("/api") || path.startsWith("/auth") || path.startsWith("/login") || path.startsWith("/register") || path.startsWith("/pending");
-    // "/" after login: only first time (no onboarded flag) forces picker
-    if (!hasValidProject && !hasOnboarded && !isProjectPage && !isApiOrAuth && path === "/") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/srivaraha/projects";
-      return NextResponse.redirect(url);
+    const { data: profile } = await supabase.from("app_users").select("assigned_project_id").eq("id", user.id).maybeSingle();
+    const assignedProjectId = (profile as any)?.assigned_project_id as string | undefined;
+
+    // ── 1️⃣  User has an admin‑assigned project ──────────────────────────────
+    if (assignedProjectId && !hasValidProject) {
+      const isRoot = path === "/";
+      const targetUrl = isRoot ? new URL("/dashboard", request.url) : request.nextUrl.clone();
+      const res = isRoot ? NextResponse.redirect(targetUrl) : NextResponse.next({ request });
+      res.cookies.set("srivaraha_project", assignedProjectId, { path: "/", maxAge: 315360000 });
+      res.cookies.set("srivaraha_onboarded", "1", { path: "/", maxAge: 315360000 });
+      return res;
     }
-    // "/" already onboarded but no project cookie (e.g. cleared): send to dashboard, let pages handle fallback
-    if (!hasValidProject && hasOnboarded && !isProjectPage && !isApiOrAuth && path === "/") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
-    // "/dashboard" without project: first time non-privileged must pick, afterwards show dashboard
-    if (!hasValidProject && !isProjectPage && !isApiOrAuth && path === "/dashboard") {
-      if (hasOnboarded) {
-        return NextResponse.next({ request });
-      }
+
+    // ── 2️⃣  No assigned project → onboarding / direct to dashboard ──────────
+    if (!hasValidProject && !isProjectPage && !isApiOrAuth && isRootOrDashboard) {
       const { data: profile } = await supabase.from("app_users").select("role").eq("id", user.id).maybeSingle();
       const role = (profile as any)?.role as string | undefined;
       const isPrivileged = role === "ADMIN" || role === "DIRECTOR";
-      if (!isPrivileged) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/srivaraha/projects";
-        return NextResponse.redirect(url);
+
+      // If user has already selected a project previously or is privileged (Admin/Director),
+      // do not show the select project page on the first page: go straight to dashboard.
+      if (hasOnboarded || isPrivileged) {
+        if (path === "/") {
+          const url = request.nextUrl.clone();
+          url.pathname = "/dashboard";
+          return NextResponse.redirect(url);
+        }
+        return NextResponse.next({ request });
       }
+
+      // First time user: direct to select project first
+      const url = request.nextUrl.clone();
+      url.pathname = "/projects";
+      return NextResponse.redirect(url);
     }
-  }
+
+    if (path === "/") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
 
   // Ensure response cookies are available after supabase client initialization
   // by re-applying any set operations through the response object.
   return response;
+}
 }

@@ -82,9 +82,8 @@ export default function NotificationsDrawer({
         .eq("recipient_user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(25);
-      if (pid) q = q.eq("project_id", pid);
+      if (pid) q = q.or(`project_id.eq.${pid},project_id.is.null`);
       const { data } = await q;
-      // pid set → strictly that project's notifications (matches inbox/history semantics)
       setItems(data ?? []);
       setLoading(false);
     })();

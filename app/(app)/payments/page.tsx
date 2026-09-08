@@ -13,6 +13,7 @@ import { ChevronRight } from "lucide-react";
 import ClickableRow from "@/components/ui/ClickableRow";
 import TabNav from "@/components/ui/TabNav";
 import BookingFilter from "@/components/payments/BookingFilter";
+import { getProjectScopeIds } from "@/lib/utils/projectScope";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +32,14 @@ const TABS = [
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; page?: string; booking?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string; booking?: string; plan?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
   const filters = await searchParams;
-  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
+  const scopeIds = await getProjectScopeIds(supabase, projectId);
 
   const tab =
     TABS.find((t) => t.key === (filters.tab ?? "ALL")) ?? TABS[0];
@@ -48,7 +51,7 @@ export default async function PaymentsPage({
   let q = supabase
     .from("payments")
     .select(
-      "id, amount, payment_date, payment_mode, status, booking_id, submitted_by, project_id, booking:booking_id(booking_id, project_name)",
+      "id, amount, payment_date, payment_mode, status, booking_id, submitted_by, project_id, reference_no, booking:booking_id(booking_id, project_name, total_property_value)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -56,16 +59,26 @@ export default async function PaymentsPage({
 
   if (["SM", "CP"].includes(user.role)) q = q.eq("submitted_by", user.id);
   if (tab.statuses.length) q = q.in("status", tab.statuses);
-  if (projectId) q = q.eq("project_id", projectId);
+  if (scopeIds) q = q.in("project_id", scopeIds);
   if (filters.booking) q = q.eq("booking_id", filters.booking);
 
   // For booking filter dropdown — project-scoped
   let bFilterQ: any = supabase.from("bookings").select("id, booking_id").order("created_at", { ascending: false }).limit(100);
   if (["SM","CP"].includes(user.role)) bFilterQ = bFilterQ.eq("created_by", user.id);
-  if (projectId) bFilterQ = bFilterQ.eq("project_id", projectId);
+  if (scopeIds) bFilterQ = bFilterQ.in("project_id", scopeIds);
   const { data: filterBookings } = await bFilterQ;
 
-  const { data: payments, count } = await q;
+  const { data: rawPayments, count } = await q;
+
+  // Filter by payment plan (One-Time vs Installment) if selected
+  const payments = (rawPayments ?? []).filter((p: any) => {
+    if (!filters.plan || filters.plan === "all") return true;
+    const isOneTime = Number(p.amount) >= Number(p.booking?.total_property_value ?? 0) || p.reference_no === "ONE_TIME" || p.reference_no === "FULL_PAYMENT";
+    if (filters.plan === "one_time") return isOneTime;
+    if (filters.plan === "installment") return !isOneTime;
+    return true;
+  });
+
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const dir = await resolveDirectory(
@@ -76,6 +89,8 @@ export default async function PaymentsPage({
     const sp = new URLSearchParams();
     sp.set("tab", over.tab ?? tab.key);
     if (over.page) sp.set("page", over.page);
+    if (over.plan ?? filters.plan) sp.set("plan", over.plan ?? filters.plan!);
+    if (over.booking ?? filters.booking) sp.set("booking", over.booking ?? filters.booking!);
     return `/payments?${sp.toString()}`;
   };
 
@@ -87,14 +102,37 @@ export default async function PaymentsPage({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <TabNav
-          tabs={TABS.map((t) => ({
-            key: t.key,
-            label: t.label,
-            href: href({ tab: t.key }),
-          }))}
-          active={tab.key}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <TabNav
+            tabs={TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              href: href({ tab: t.key }),
+            }))}
+            active={tab.key}
+          />
+          {/* One-time vs Installment filter */}
+          <div className="flex items-center rounded-xl border border-border bg-white p-1 text-xs font-medium shadow-sm">
+            <Link
+              href={href({ plan: "all" })}
+              className={cn("px-2.5 py-1 rounded-lg transition", (!filters.plan || filters.plan === "all") ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:text-slate-900")}
+            >
+              All Types
+            </Link>
+            <Link
+              href={href({ plan: "one_time" })}
+              className={cn("px-2.5 py-1 rounded-lg transition", filters.plan === "one_time" ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:text-slate-900")}
+            >
+              One-time
+            </Link>
+            <Link
+              href={href({ plan: "installment" })}
+              className={cn("px-2.5 py-1 rounded-lg transition", filters.plan === "installment" ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:text-slate-900")}
+            >
+              Installment
+            </Link>
+          </div>
+        </div>
         <BookingFilter bookings={filterBookings ?? []} current={filters.booking} />
       </div>
 

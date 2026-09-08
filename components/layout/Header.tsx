@@ -34,7 +34,7 @@ export default function Header({ user }: { user: SessionUser }) {
       const pid = getCurrentProjectId();
       let q: any = supabase.from("notifications").select("id", { count: "exact", head: true })
         .eq("recipient_user_id", user.id).eq("is_read", false);
-      if (pid) q = q.eq("project_id", pid);
+      if (pid) q = q.or(`project_id.eq.${pid},project_id.is.null`);
       const { count } = await q;
       if (alive) setUnread(count ?? 0);
     };
@@ -46,14 +46,8 @@ export default function Header({ user }: { user: SessionUser }) {
         (payload) => {
           const notification = payload.new as { category?: string; priority?: string; title?: string; message?: string; project_id?: string | null };
           const pid = getCurrentProjectId();
-          // Hide cross-project notifications when a project is selected – same as drawer/inbox
+          // Hide cross-project notifications when a project is selected
           if (pid && notification.project_id && notification.project_id !== pid) return;
-          // When pid is set and notification is global (null), inbox semantics hide it – match that
-          if (pid && !notification.project_id) {
-            // Global notifications (e.g. ACCESS_REQUEST) still shown only in All Projects
-            // Skip to keep drawer/inbox/header consistent
-            return;
-          }
           if (!isNotificationCategoryEnabled(notification.category ?? "")) return;
           if (["HIGH", "URGENT"].includes(notification.priority ?? "")) playNotificationSound();
           showBrowserNotification(notification.title ?? "Aurum notification", notification.message ?? "You have a new update.");

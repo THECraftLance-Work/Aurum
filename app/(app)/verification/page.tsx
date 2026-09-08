@@ -11,16 +11,12 @@ import { cn } from "@/lib/utils/cn";
 import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import ClickableRow from "@/components/ui/ClickableRow";
 import TabNav from "@/components/ui/TabNav";
+import { getProjectScopeIds } from "@/lib/utils/projectScope";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Bookings and payments are verified independently.
- *
- * The Payments tab exists because payment approval used to ride entirely on
- * booking approval. Once a booking was APPROVED it left the pending list, so a
- * second payment added to it was invisible here and could never be actioned —
- * it sat in PENDING forever and was excluded from the booking's paid total.
  */
 const BOOKING_TABS = [
   { key: "PENDING", label: "Bookings", statuses: ["SUBMITTED", "UNDER_REVIEW", "UPDATED"] },
@@ -32,30 +28,37 @@ export default async function VerificationPage({
   searchParams
 }: { searchParams: Promise<{ tab?: string }> }) {
   const filters = await searchParams;
-  await requireRole(["ACCOUNTANT", "ADMIN", "DIRECTOR"]);
+  await requireRole(["ACCOUNTANT", "DIRECTOR"]);
   const supabase = await createSupabaseServer();
+  const { cookies } = await import("next/headers");
+  const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
+  const scopeIds = await getProjectScopeIds(supabase, projectId);
   const activeKey = filters.tab ?? "PAYMENTS";
   const bookingTab = BOOKING_TABS.find((t) => t.key === activeKey);
 
-  // The pending-payment count drives the tab badge, so it's always fetched.
-  const pendingPaymentsQuery = supabase
+  // Project-scoped: Tatva queue must not leak into Aurum and vice-versa.
+  // When no project selected (ADMIN/DIRECTOR All Projects) show all.
+  let pendingPaymentsQuery: any = supabase
     .from("payments")
     .select(
-      "id, amount, payment_date, payment_mode, reference_no, status, created_at, booking_id, submitted_by, booking:booking_id(id, booking_id, project_name, unit_number)",
+      "id, amount, payment_date, payment_mode, reference_no, status, created_at, booking_id, submitted_by, project_id, booking:booking_id(id, booking_id, project_name, unit_number)",
       { count: "exact" }
     )
     .in("status", ["PENDING", "UNDER_REVIEW"])
     .order("created_at", { ascending: true })
     .limit(100);
+  if (scopeIds) pendingPaymentsQuery = pendingPaymentsQuery.in("project_id", scopeIds);
 
-  const bookingsQuery = bookingTab
+  let bookingsQuery: any = bookingTab
     ? supabase
         .from("bookings")
-        .select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, submitted_at, created_by, customer:customer_id(name)")
+        .select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, submitted_at, created_by, project_id, customer:customer_id(name)")
         .in("status", bookingTab.statuses)
         .order("submitted_at", { ascending: false })
         .limit(100)
     : Promise.resolve({ data: [] as any[] } as any);
+  if (scopeIds && bookingTab) bookingsQuery = bookingsQuery.in("project_id", scopeIds);
 
   const [payRes, bookRes] = await Promise.all([pendingPaymentsQuery, bookingsQuery]);
   const pendingPayments = payRes.data ?? [];

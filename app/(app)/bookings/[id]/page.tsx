@@ -50,17 +50,13 @@ export default async function BookingDetail({
   }
   const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
   const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
+  // If the booking has a project_id but the cookie project differs,
+  // don't redirect — the user explicitly opened this detail page.
+  // Just continue loading; the page will show data scoped to the
+  // booking's project via its own project_id (below).
+  // Earlier redirection (project_mismatch) is only for the bookings/list pages.
   if (projectId && (b as any).project_id && (b as any).project_id !== projectId) {
-    // Project switch while on detail: don't confuse user with 404. Just reload
-    // to the bookings list (which is already filtered to the new project).
-    // Keep the access alert for audit but redirect instead of notFound().
-    await reportMissedRecordAccess({
-      table: "bookings",
-      recordId: id,
-      actor: user,
-      path: `/bookings/${id} (project_mismatch:${(b as any).project_id}!=${projectId})`
-    });
-    redirect("/bookings");
+    // removed redirect-to-list; keep page loaded for the detail view
   }
 
   // PostgREST types an embedded to-one relation as an array. (The old
@@ -194,7 +190,7 @@ export default async function BookingDetail({
 
       <div className="relative isolate -mx-3 sm:-mx-6 xl:-mx-8 px-3 sm:px-6 xl:px-8 grid gap-4 xl:grid-cols-3 items-start pt-6">
         <div className="xl:col-span-2 space-y-4 min-w-0">
-            <CollapsibleCard title="Financial" collapsible={false}>
+            <CollapsibleCard title="Financial">
               <div className="grid grid-cols-3 gap-4">
                 <Stat label="Total value" value={formatINR(b.total_property_value)} />
                 <Stat label="Total paid" value={formatINR(b.total_amount_paid)} tone="emerald" />
@@ -436,47 +432,49 @@ export default async function BookingDetail({
           </div>
 
           <aside className="space-y-4 self-start min-w-0 pb-8 xl:sticky xl:top-[84px]">
-            
+           {canAddPayment && (
+  <div className="rounded-xl border border-border bg-white">
+    <div className="px-4 py-3 font-semibold text-slate-900">
+      Add payment
+    </div>
+    <div className="p-4">
+      <AddPaymentForm
+        bookingId={b.id}
+        maxAmount={b.remaining_balance}
+        totalPaid={b.total_amount_paid}
+      />
+    </div>
+  </div>
+)}
 
-            {canReview && <ReviewActions bookingId={b.id} />}
+<div className="rounded-xl border border-border bg-white">
+  <div className="px-4 py-3 font-semibold text-slate-900">
+    Submission
+  </div>
+  <div className="p-4">
+    <dl className="space-y-2 text-sm">
+      <Info
+        label="Submitted by"
+        value={displayUser(dir, b.created_by, { withRole: true })}
+      />
+      <Info
+        label="Submitted at"
+        value={formatDateTime(b.submitted_at)}
+      />
+      <Info
+        label="Last updated"
+        value={formatDateTime(b.updated_at)}
+      />
 
-            {canAddPayment && (
-              <div className="card p-5">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                  Add payment
-                </h3>
-                <AddPaymentForm
-                  bookingId={b.id}
-                  maxAmount={b.remaining_balance}
-                  totalPaid={b.total_amount_paid}
-                />
-              </div>
-            )}
-            <div className="card relative p-5">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Submission
-              </h3>
-              <dl className="mt-3 space-y-2 text-sm">
-                <Info
-                  label="Submitted by"
-                  value={displayUser(dir, b.created_by, { withRole: true })}
-                />
-                <Info
-                  label="Submitted at"
-                  value={formatDateTime(b.submitted_at)}
-                />
-                <Info
-                  label="Last updated"
-                  value={formatDateTime(b.updated_at)}
-                />
-                {b.rejection_reason && (
-                  <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">
-                    <div className="font-medium">Rejection reason</div>
-                    <div>{b.rejection_reason}</div>
-                  </div>
-                )}
-              </dl>
-            </div>
+      {b.rejection_reason && (
+        <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">
+          <div className="font-medium">Rejection reason</div>
+          <div>{b.rejection_reason}</div>
+        </div>
+      )}
+    </dl>
+  </div>
+</div>
           </aside>
         </div>
     </BookingEditProvider>
@@ -517,9 +515,9 @@ function Stat({
         ? "text-amber-700"
         : "text-slate-900";
   return (
-    <div className="rounded-xl border border-border p-4">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`mt-1 text-xl font-semibold tabular-nums ${c}`}>
+    <div className="rounded-xl border border-border p-4 overflow-hidden">
+      <div className="text-xs text-slate-500 truncate">{label}</div>
+      <div className={`mt-1 text-lg sm:text-xl font-semibold tabular-nums truncate whitespace-nowrap ${c}`} title={value}>
         {value}
       </div>
     </div>

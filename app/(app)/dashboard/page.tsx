@@ -13,6 +13,7 @@ import {
   ClipboardList, Wallet, TrendingUp, ShieldCheck, CheckCircle2, XCircle, Users, Clock, Plus, ArrowRight
 } from "lucide-react";
 import AddEmployeeButton from "@/components/users/AddEmployeeButton";
+import { getProjectScopeIds } from "@/lib/utils/projectScope";
 
 export const dynamic = "force-dynamic";
 
@@ -21,29 +22,29 @@ export default async function DashboardPage() {
   const supabase = await createSupabaseServer();
   const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
   const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
+  const scopeIds = await getProjectScopeIds(supabase, projectId);
 
   const own = ["SM", "CP"].includes(user.role);
 
   // Project-scoped when column exists; falls back to unfiltered if migration not yet applied
   let bq: any = supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at, project_id");
   if (own) bq = bq.eq("created_by", user.id);
-  if (projectId) {
-    // Will be ignored if project_id column missing (pre-migration) — dashboard still opens
-    try { bq = bq.eq("project_id", projectId); } catch {}
+  if (scopeIds) {
+    bq = bq.in("project_id", scopeIds);
   }
   const bookingsQ = bq.order("created_at", { ascending: false }).limit(50);
 
   let pq: any = supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id), project_id");
   if (own) pq = pq.eq("submitted_by", user.id);
-  if (projectId) {
-    try { pq = pq.eq("project_id", projectId); } catch {}
+  if (scopeIds) {
+    pq = pq.in("project_id", scopeIds);
   }
   const paymentsQ = pq.order("created_at", { ascending: false }).limit(50);
 
   let statsResRaw: any, bookingsRes: any, paymentsRes: any, pendingUsersRes: any;
   try {
     [statsResRaw, bookingsRes, paymentsRes, pendingUsersRes] = await Promise.all([
-      projectId ? Promise.resolve({ data: null } as any) : supabase.rpc("get_dashboard_stats").maybeSingle(),
+      scopeIds ? Promise.resolve({ data: null } as any) : supabase.rpc("get_dashboard_stats").maybeSingle(),
       bookingsQ,
       paymentsQ,
       user.role === "DIRECTOR"
@@ -73,8 +74,8 @@ export default async function DashboardPage() {
     try {
       let aq: any = supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status, project_id");
       if (own) aq = aq.eq("created_by", user.id);
-      if (projectId) {
-        try { aq = aq.eq("project_id", projectId); } catch {}
+      if (scopeIds) {
+        aq = aq.in("project_id", scopeIds);
       }
       const { data: agg, error: aggErr } = await aq.limit(1000);
       if (aggErr) throw aggErr;

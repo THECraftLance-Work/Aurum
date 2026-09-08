@@ -16,7 +16,7 @@ const NAV: Item[] = [
   { href: "/dashboard",  label: "Dashboard",         icon: LayoutDashboard, roles: ["SM","CP","ACCOUNTANT","ADMIN","DIRECTOR"] },
   { href: "/bookings",   label: "Bookings",          icon: ClipboardList,   roles: ["SM","CP","ACCOUNTANT","ADMIN","DIRECTOR"] },
   { href: "/payments",   label: "Payments",          icon: Wallet,          roles: ["SM","CP","ACCOUNTANT","ADMIN","DIRECTOR"] },
-  { href: "/verification", label: "Verification Queue", icon: ShieldCheck,  roles: ["ACCOUNTANT","ADMIN","DIRECTOR"] },
+  { href: "/verification", label: "Verification Queue", icon: ShieldCheck,  roles: ["ACCOUNTANT","DIRECTOR"] },
   { href: "/approvals",  label: "User Approvals",    icon: UserCog,         roles: ["DIRECTOR"] },
   { href: "/users",      label: "Users",             icon: Users,           roles: ["ADMIN","DIRECTOR"] },
   { href: "/inbox",      label: "Inbox",             icon: Inbox,           roles: ["SM","CP","ACCOUNTANT","ADMIN","DIRECTOR"] },
@@ -68,9 +68,11 @@ export default function Sidebar({
     window.dispatchEvent(new StorageEvent("storage", { key: "srivaraha_project", newValue: id } as any));
     router.refresh();
   }
-  const filteredProjects = projects.filter((p:any)=> p.slug !== "sri-varaha");
-  const isPrivileged = ["ADMIN","DIRECTOR"].includes(user.role);
-  const currentProjectName = currentProject ? (filteredProjects.find((p:any)=>p.id===currentProject)?.name ?? "All Projects") : isPrivileged ? "All Projects" : "Select project";
+  const parentProject = projects.find((p: any) => p.slug === "sri-varaha");
+  const subProjects = projects.filter((p: any) => p.slug !== "sri-varaha");
+  const isPrivileged = ["ADMIN", "DIRECTOR"].includes(user.role);
+  const activeProj = projects.find((p: any) => p.id === currentProject);
+  const currentProjectName = activeProj ? activeProj.name : isPrivileged ? "All Projects (Sri Varaha)" : "Select project";
   const accent = roleAccent[user.role];
   const items = NAV.filter((i) => i.roles.includes(user.role));
   const primaryItems = items.slice(0, 4);
@@ -85,24 +87,25 @@ export default function Sidebar({
               <Building2 className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold leading-tight text-white truncate">{projects.find(p=>p.id===currentProject)?.name ?? "Aurum Real Estate"}</div>
-              <div className="text-[11px] leading-tight text-white/70 truncate">{currentProject ? "SRI VARAHA / Projects" : "Operations"} • {currentProjectName}</div>
+              <div className="text-sm font-semibold leading-tight text-white truncate">{activeProj?.name ?? "Sri Varaha Operations"}</div>
+              <div className="text-[11px] leading-tight text-white/70 truncate">{activeProj?.parent_id ? "Sub-project" : "Workspace"} • {currentProjectName}</div>
             </div>
             <ChevronDown className={`h-4 w-4 text-white/70 shrink-0 transition-transform ${projectOpen ? "rotate-180" : ""}`} />
           </button>
           {projectOpen && (
             <div className="absolute left-0 right-0 top-full z-40 mt-2 rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden">
               <div className="max-h-64 overflow-y-auto py-1">
-                {isPrivileged && (
-                  <button onClick={()=> { document.cookie = `srivaraha_project=; path=/; max-age=0`; localStorage.removeItem("srivaraha_project"); setCurrentProject(""); setProjectOpen(false); router.refresh(); }} className={`flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-50 ${!currentProject ? "bg-red-50 text-[#ec3013] font-medium" : "text-slate-700"}`}>
-                    <span className="truncate">All Projects <span className="ml-1 text-xs text-slate-400">Sri Varaha</span></span>
-                    {!currentProject && <span className="h-2 w-2 rounded-full bg-[#ec3013]" />}
-                  </button>
-                )}
-                {filteredProjects.length===0 && <div className="px-3 py-2 text-xs text-slate-500">No projects</div>}
-                {filteredProjects.map((p:any)=>(
-                  <button key={p.id} onClick={()=> selectProject(p.id)} className={`flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-50 ${currentProject===p.id ? "bg-red-50 text-[#ec3013] font-medium" : "text-slate-700"}`}>
-                    <span className="truncate">{p.name}<span className="ml-1 text-xs text-slate-400">{p.slug}</span></span>
+
+
+
+                <div className="px-3 pt-2 pb-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 border-t border-slate-100">Sub-Projects</div>
+                {subProjects.length===0 && <div className="px-3 py-2 text-xs text-slate-500">No sub-projects</div>}
+                {subProjects.map((p:any)=>(
+                  <button key={p.id} onClick={()=> selectProject(p.id)} className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-slate-50 ${currentProject===p.id ? "bg-red-50 text-[#ec3013] font-semibold" : "text-slate-700"}`}>
+                    <span className="truncate pl-2 flex items-center gap-1.5">
+                      <span>{p.name}</span>
+                      <span className="text-xs text-slate-400 font-normal">({p.slug})</span>
+                    </span>
                     {currentProject===p.id && <span className="h-2 w-2 rounded-full bg-[#ec3013]" />}
                   </button>
                 ))}

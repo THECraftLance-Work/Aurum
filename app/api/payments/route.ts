@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const admin = createSupabaseAdmin();
   const { data: bk } = await admin
     .from("bookings")
-    .select("id, booking_id, created_by, remaining_balance, total_amount_paid, total_property_value, customer:customer_id(name, email)")
+    .select("id, booking_id, created_by, remaining_balance, total_amount_paid, total_property_value, project_id, customer:customer_id(name, email)")
     .eq("id", booking_id)
     .maybeSingle();
   if (!bk) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -80,7 +80,8 @@ export async function POST(req: Request) {
     payment_mode,
     reference_no,
     status: "PENDING",
-    submitted_by: profile.id
+    submitted_by: profile.id,
+    project_id: (bk as any).project_id ?? null
   }).select("id").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -107,7 +108,8 @@ export async function POST(req: Request) {
     message: `Payment of ₹${Number(amount).toLocaleString("en-IN")} added on ${bk.booking_id}.`,
     entityType: "booking",
     entityId: bk.id,
-    priority: "HIGH"
+    priority: "HIGH",
+    projectId: (bk as any).project_id ?? null
   });
   await writeAudit({
     actorUserId: profile.id, actorRole: profile.role,

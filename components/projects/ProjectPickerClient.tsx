@@ -8,6 +8,10 @@ import { useToast } from "@/components/ui/Toast";
 export default function ProjectPickerClient({ projects, isAdmin, isDirector }: { projects: any[]; isAdmin: boolean; isDirector?: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
+  const [projectsList, setProjectsList] = useState<any[]>(projects);
+  useEffect(() => {
+    setProjectsList(projects);
+  }, [projects]);
   const [current, setCurrent] = useState<string | null>(null);
   const [name, setName] = useState(""); const [slug, setSlug] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
@@ -36,12 +40,13 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
     return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("srivaraha:project", onCustom as any); };
   }, []);
   function select(id: string) {
-    document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=31536000`;
+    document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=315360000`;
     document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
     localStorage.setItem("srivaraha_project", id);
     try { localStorage.setItem("srivaraha_onboarded", "1"); } catch {}
     setCurrent(id);
     window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: id }));
+    window.dispatchEvent(new StorageEvent("storage", { key: "srivaraha_project", newValue: id } as any));
     router.refresh();
     router.push("/dashboard");
   }
@@ -54,33 +59,36 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
   }
   function startEdit(p: any) {
     setEditing(p);
-    setEditSale(p.default_sale_consideration ? String(p.default_sale_consideration) : "");
+    setEditSale(p.default_sale_consideration !== undefined && p.default_sale_consideration !== null ? String(p.default_sale_consideration) : "");
     const a = p.default_areas ?? {};
     setEditFields({
-      saleable_area: a.saleable_area ? String(a.saleable_area) : "",
-      carpet_area: a.carpet_area ? String(a.carpet_area) : "",
-      external_walls_area: a.external_walls_area ? String(a.external_walls_area) : "",
-      balcony_utility_area: a.balcony_utility_area ? String(a.balcony_utility_area) : "",
-      common_area: a.common_area ? String(a.common_area) : "",
-      base_price: a.base_price ? String(a.base_price) : "",
-      floor_rise_charges: a.floor_rise_charges ? String(a.floor_rise_charges) : "",
-      east_facing_charges: a.east_facing_charges ? String(a.east_facing_charges) : "",
-      premium_view_charges: a.premium_view_charges ? String(a.premium_view_charges) : "",
-      amenities_charges: a.amenities_charges ? String(a.amenities_charges) : "",
-      car_parking_charges: a.car_parking_charges ? String(a.car_parking_charges) : "",
-      legal_documentation_charges: a.legal_documentation_charges ? String(a.legal_documentation_charges) : "",
-      sale_consideration_per_sqft: a.sale_consideration_per_sqft ? String(a.sale_consideration_per_sqft) : "",
+      saleable_area: a.saleable_area !== undefined && a.saleable_area !== null ? String(a.saleable_area) : "",
+      carpet_area: a.carpet_area !== undefined && a.carpet_area !== null ? String(a.carpet_area) : "",
+      external_walls_area: a.external_walls_area !== undefined && a.external_walls_area !== null ? String(a.external_walls_area) : "",
+      balcony_utility_area: a.balcony_utility_area !== undefined && a.balcony_utility_area !== null ? String(a.balcony_utility_area) : "",
+      common_area: a.common_area !== undefined && a.common_area !== null ? String(a.common_area) : "",
+      base_price: a.base_price !== undefined && a.base_price !== null ? String(a.base_price) : "",
+      floor_rise_charges: a.floor_rise_charges !== undefined && a.floor_rise_charges !== null ? String(a.floor_rise_charges) : "",
+      east_facing_charges: a.east_facing_charges !== undefined && a.east_facing_charges !== null ? String(a.east_facing_charges) : "",
+      premium_view_charges: a.premium_view_charges !== undefined && a.premium_view_charges !== null ? String(a.premium_view_charges) : "",
+      amenities_charges: a.amenities_charges !== undefined && a.amenities_charges !== null ? String(a.amenities_charges) : "",
+      car_parking_charges: a.car_parking_charges !== undefined && a.car_parking_charges !== null ? String(a.car_parking_charges) : "",
+      legal_documentation_charges: a.legal_documentation_charges !== undefined && a.legal_documentation_charges !== null ? String(a.legal_documentation_charges) : "",
+      sale_consideration_per_sqft: a.sale_consideration_per_sqft !== undefined && a.sale_consideration_per_sqft !== null ? String(a.sale_consideration_per_sqft) : "",
     });
   }
   async function saveEdit() {
     if (!editing) return;
     const areas: any = {};
     Object.entries(editFields).forEach(([k,v]) => { if (String(v).trim() !== "") areas[k] = Number(v); });
-    const res = await fetch(`/api/projects/${editing.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ default_sale_consideration: editSale ? Number(editSale) : null, default_areas: areas }) });
+    const saleVal = editSale ? Number(editSale) : null;
+    const res = await fetch(`/api/projects/${editing.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ default_sale_consideration: saleVal, default_areas: areas }) });
     const j = await res.json().catch(()=> ({}));
     if (!res.ok) { toast({ title: j.error ?? "Failed to save", tone: "error" }); return; }
     toast({ title: "Defaults updated", tone: "success" });
-    setEditing(null); router.refresh();
+    setProjectsList(prev => prev.map(p => p.id === editing.id ? { ...p, default_sale_consideration: saleVal, default_areas: areas } : p));
+    setEditing(null);
+    router.refresh();
   }
   async function sendDeleteOtp() {
     if (!deleting || otpSending) return;
@@ -126,8 +134,8 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
       setDeletingBusy(false);
     }
   }
-  const company = projects.find((p: any) => p.slug === "sri-varaha");
-  const items = projects.filter((p: any) => p.slug !== "sri-varaha");
+  const company = projectsList.find((p: any) => p.slug === "sri-varaha");
+  const items = projectsList.filter((p: any) => p.slug !== "sri-varaha");
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

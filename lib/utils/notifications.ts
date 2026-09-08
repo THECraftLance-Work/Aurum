@@ -27,11 +27,19 @@ export async function sendNotification(n: NotifInput) {
 
 export async function notifyRole(role: "SM" | "CP" | "ACCOUNTANT" | "ADMIN" | "DIRECTOR", n: Omit<NotifInput, "recipientUserId">) {
   const admin = createSupabaseAdmin();
-  const { data: users } = await admin
+  let query = admin
     .from("app_users")
-    .select("id")
+    .select("id, assigned_project_id, role")
     .eq("role", role)
     .eq("status", "APPROVED");
+
+  const projectId = (n as any).projectId ?? null;
+  // If role is SM, CP, or ACCOUNTANT and a projectId is given, filter to users assigned to this project or unassigned (all projects)
+  if (projectId && ["SM", "CP", "ACCOUNTANT"].includes(role)) {
+    query = query.or(`assigned_project_id.eq.${projectId},assigned_project_id.is.null`);
+  }
+
+  const { data: users } = await query;
   if (!users?.length) return;
   await admin.from("notifications").insert(
     users.map((u) => ({
@@ -42,7 +50,7 @@ export async function notifyRole(role: "SM" | "CP" | "ACCOUNTANT" | "ADMIN" | "D
       entity_type: n.entityType,
       entity_id: n.entityId,
       priority: n.priority ?? "NORMAL",
-      project_id: (n as any).projectId ?? null
+      project_id: projectId
     }))
   );
 }

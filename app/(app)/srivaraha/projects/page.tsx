@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function SriVarahaProjectsPage() {
   const user = await requireUser();
   const admin = createSupabaseAdmin();
-  const { data: projects } = await admin.from("projects").select("id, slug, name, parent_id, is_active, default_sale_consideration, created_at").eq("is_active", true).order("name");
+  const { data: projects } = await admin.from("projects").select("id, slug, name, parent_id, is_active, default_sale_consideration, default_areas, created_at").eq("is_active", true).order("name");
   const isAdmin = user.role === "ADMIN";
   const isDirector = user.role === "DIRECTOR";
 
