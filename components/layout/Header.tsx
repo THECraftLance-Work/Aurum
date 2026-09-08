@@ -19,12 +19,20 @@ export default function Header({ user }: { user: SessionUser }) {
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  function getCurrentProjectId(): string | null {
+    const m = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1];
+    if (m) return decodeURIComponent(m);
+    try { return localStorage.getItem("srivaraha_project"); } catch { return null; }
+  }
+
   useEffect(() => {
     let alive = true;
     const load = async () => {
-      const { count } = await supabase
-        .from("notifications").select("id", { count: "exact", head: true })
+      const pid = getCurrentProjectId();
+      let q: any = supabase.from("notifications").select("id", { count: "exact", head: true })
         .eq("recipient_user_id", user.id).eq("is_read", false);
+      if (pid) q = q.eq("project_id", pid);
+      const { count } = await q;
       if (alive) setUnread(count ?? 0);
     };
     load();
@@ -33,7 +41,16 @@ export default function Header({ user }: { user: SessionUser }) {
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${user.id}` },
         (payload) => {
-          const notification = payload.new as { category?: string; priority?: string; title?: string; message?: string };
+          const notification = payload.new as { category?: string; priority?: string; title?: string; message?: string; project_id?: string | null };
+          const pid = getCurrentProjectId();
+          // Hide cross-project notifications when a project is selected – same as drawer/inbox
+          if (pid && notification.project_id && notification.project_id !== pid) return;
+          // When pid is set and notification is global (null), inbox semantics hide it – match that
+          if (pid && !notification.project_id) {
+            // Global notifications (e.g. ACCESS_REQUEST) still shown only in All Projects
+            // Skip to keep drawer/inbox/header consistent
+            return;
+          }
           if (!isNotificationCategoryEnabled(notification.category ?? "")) return;
           if (["HIGH", "URGENT"].includes(notification.priority ?? "")) playNotificationSound();
           showBrowserNotification(notification.title ?? "Aurum notification", notification.message ?? "You have a new update.");
@@ -42,7 +59,10 @@ export default function Header({ user }: { user: SessionUser }) {
         { event: "*", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${user.id}` },
         load)
       .subscribe();
-    return () => { alive = false; supabase.removeChannel(ch); };
+    const onProject = () => load();
+    window.addEventListener("srivaraha:project", onProject as any);
+    window.addEventListener("storage", onProject as any);
+    return () => { alive = false; supabase.removeChannel(ch); window.removeEventListener("srivaraha:project", onProject as any); window.removeEventListener("storage", onProject as any); };
   }, [supabase, user.id]);
 
   async function signOut() {

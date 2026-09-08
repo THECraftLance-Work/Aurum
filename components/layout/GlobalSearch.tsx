@@ -58,6 +58,11 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
+  function getProjectId(): string | null {
+    const m = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1];
+    if (m) return decodeURIComponent(m);
+    try { return localStorage.getItem("srivaraha_project"); } catch { return null; }
+  }
   useEffect(() => {
     setActive(0);
     if (!query.trim()) { setResults([]); setLoading(false); return; }
@@ -65,8 +70,11 @@ export default function GlobalSearch({ user }: { user: SessionUser }) {
     const timer = setTimeout(async () => {
       setLoading(true);
       const term = query.trim().replace(/[%,()\\.]/g, " ");
+      const pid = getProjectId();
+      let bq: any = supabase.from("bookings").select("id, booking_id, project_name, unit_number, project_id").or(`booking_id.ilike.%${term}%,project_name.ilike.%${term}%,unit_number.ilike.%${term}%`).limit(6);
+      if (pid) bq = bq.eq("project_id", pid);
       const [bookings, customers, users] = await Promise.all([
-        supabase.from("bookings").select("id, booking_id, project_name, unit_number").or(`booking_id.ilike.%${term}%,project_name.ilike.%${term}%,unit_number.ilike.%${term}%`).limit(6),
+        bq,
         supabase.from("customers").select("id, name, phone, email").or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`).limit(6),
         ["ADMIN", "DIRECTOR"].includes(user.role)
           ? supabase.from("app_users").select("id, name, email, role").or(`name.ilike.%${term}%,email.ilike.%${term}%`).limit(6)

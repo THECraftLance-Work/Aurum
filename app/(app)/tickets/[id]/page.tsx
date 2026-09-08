@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -23,6 +24,8 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
     .eq("id", id)
     .maybeSingle();
   if (!t) notFound();
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  if (projectId && (t as any).project_id && (t as any).project_id !== projectId) notFound();
 
   const isStaff = ["ADMIN", "DIRECTOR"].includes(user.role);
 

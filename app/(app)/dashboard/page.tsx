@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
@@ -18,38 +19,65 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
 
   const own = ["SM", "CP"].includes(user.role);
 
-  // All four run in parallel. The aggregate is a Postgres RPC — previously this
-  // page pulled every booking row and reduced in JS to produce six numbers.
-  const [statsRes, bookingsRes, paymentsRes, pendingUsersRes] = await Promise.all([
-    supabase.rpc("get_dashboard_stats").maybeSingle(),
-    own
-      ? supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at").eq("created_by", user.id).order("created_at", { ascending: false }).limit(50)
-      : supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at").order("created_at", { ascending: false }).limit(50),
-    own
-      ? supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id)").eq("submitted_by", user.id).order("created_at", { ascending: false }).limit(50)
-      : supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id)").order("created_at", { ascending: false }).limit(50),
-    user.role === "DIRECTOR"
-      ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("status", "PENDING_APPROVAL")
-      : Promise.resolve({ count: 0 } as any)
-  ]);
+  // Project-scoped when column exists; falls back to unfiltered if migration not yet applied
+  let bq: any = supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at, project_id");
+  if (own) bq = bq.eq("created_by", user.id);
+  if (projectId) {
+    // Will be ignored if project_id column missing (pre-migration) — dashboard still opens
+    try { bq = bq.eq("project_id", projectId); } catch {}
+  }
+  const bookingsQ = bq.order("created_at", { ascending: false }).limit(50);
+
+  let pq: any = supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id), project_id");
+  if (own) pq = pq.eq("submitted_by", user.id);
+  if (projectId) {
+    try { pq = pq.eq("project_id", projectId); } catch {}
+  }
+  const paymentsQ = pq.order("created_at", { ascending: false }).limit(50);
+
+  let statsResRaw: any, bookingsRes: any, paymentsRes: any, pendingUsersRes: any;
+  try {
+    [statsResRaw, bookingsRes, paymentsRes, pendingUsersRes] = await Promise.all([
+      projectId ? Promise.resolve({ data: null } as any) : supabase.rpc("get_dashboard_stats").maybeSingle(),
+      bookingsQ,
+      paymentsQ,
+      user.role === "DIRECTOR"
+        ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("status", "PENDING_APPROVAL")
+        : Promise.resolve({ count: 0 } as any)
+    ]);
+  } catch (e: any) {
+    // project_id column not yet migrated — retry without project filter so dashboard still opens for Admin
+    if (/project_id|column|schema cache/i.test(String(e?.message ?? e))) {
+      const bq2: any = supabase.from("bookings").select("id, booking_id, project_name, unit_number, total_property_value, total_amount_paid, status, created_at").order("created_at", { ascending: false }).limit(50);
+      const pq2: any = supabase.from("payments").select("id, amount, payment_date, payment_mode, status, submitted_by, booking:booking_id(booking_id)").order("created_at", { ascending: false }).limit(50);
+      [statsResRaw, bookingsRes, paymentsRes, pendingUsersRes] = await Promise.all([
+        supabase.rpc("get_dashboard_stats").maybeSingle(),
+        own ? bq2.eq("created_by", user.id) : bq2,
+        own ? pq2.eq("submitted_by", user.id) : pq2,
+        user.role === "DIRECTOR" ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("status", "PENDING_APPROVAL") : Promise.resolve({ count: 0 } as any)
+      ]);
+    } else throw e;
+  }
 
   // Fall back to computing from the rows we already have if the aggregate RPC
   // is unavailable (e.g. migration 0002 not yet applied, or a transient error).
   // A failed KPI tile must not take down the whole dashboard.
-  let s = (statsRes.data ?? null) as Record<string, number> | null;
+  let s = ((statsResRaw as any)?.data ?? null) as Record<string, number> | null;
   if (!s) {
-    const { data: agg } = own
-      ? await supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status").eq("created_by", user.id).limit(1000)
-      : await supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status").limit(1000);
+    let aq: any = supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status, project_id");
+    if (own) aq = aq.eq("created_by", user.id);
+    if (projectId) aq = aq.eq("project_id", projectId);
+    const { data: agg } = await aq.limit(1000);
     const a = agg ?? [];
     s = {
       total_bookings: a.length,
-      total_value: a.reduce((t, r: any) => t + Number(r.total_property_value ?? 0), 0),
-      total_received: a.reduce((t, r: any) => t + Number(r.total_amount_paid ?? 0), 0),
-      total_pending: a.reduce((t, r: any) => t + Number(r.remaining_balance ?? 0), 0),
+      total_value: a.reduce((t: number, r: any) => t + Number(r.total_property_value ?? 0), 0),
+      total_received: a.reduce((t: number, r: any) => t + Number(r.total_amount_paid ?? 0), 0),
+      total_pending: a.reduce((t: number, r: any) => t + Number(r.remaining_balance ?? 0), 0),
       pending_verification: a.filter((r: any) => ["SUBMITTED", "UNDER_REVIEW", "UPDATED"].includes(r.status)).length,
       approved_count: a.filter((r: any) => r.status === "APPROVED").length,
       rejected_count: a.filter((r: any) => r.status === "REJECTED").length

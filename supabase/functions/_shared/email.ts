@@ -47,6 +47,7 @@ export async function sendEmail(input: {
   subject: string;
   html: string;
   text: string;
+  attachments?: { filename: string; content: string; contentType?: string }[] | null;
   /** Stable per-booking key — makes every mail about one booking thread together. */
   threadKey?: string | null;
 }): Promise<SendResult> {
@@ -94,6 +95,12 @@ export async function sendEmail(input: {
     headers["In-Reply-To"] = threadId;
   }
 
+  const attachments = (input.attachments ?? []).map((a) => ({
+    filename: a.filename,
+    content: Uint8Array.from(atob(a.content), (c) => c.charCodeAt(0)),
+    contentType: a.contentType ?? "application/pdf",
+  }));
+
   let transport: ReturnType<typeof nodemailer.createTransport> | null = null;
 
   try {
@@ -118,6 +125,7 @@ export async function sendEmail(input: {
       text: input.text,
       html: input.html,
       headers,
+      attachments: attachments.length ? attachments : undefined,
       // Align the SMTP envelope sender with the From header.
       envelope: { from: user, to: input.to }
     });

@@ -21,6 +21,7 @@ export type DeliveryRow = {
     // EMAIL
     html?: string;
     text?: string;
+    attachments?: { filename: string; content: string; contentType?: string }[];
     // WHATSAPP
     bodyParams?: string[];
     urlButtonParam?: string;

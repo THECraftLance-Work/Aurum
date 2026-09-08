@@ -69,7 +69,20 @@ export async function updateSession(request: NextRequest) {
       }
     }
   );
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // First-login project picker: if authenticated and no project selected, force SRIVARAHA/Projects
+  if (user) {
+    const hasProject = request.cookies.has("srivaraha_project");
+    const path = request.nextUrl.pathname;
+    const isProjectPage = path.startsWith("/srivaraha") || path === "/projects" || path.startsWith("/projects/");
+    const isApiOrAuth = path.startsWith("/api") || path.startsWith("/auth") || path.startsWith("/login") || path.startsWith("/register") || path.startsWith("/pending");
+    if (!hasProject && !isProjectPage && !isApiOrAuth && (path === "/" || path === "/dashboard")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/srivaraha/projects";
+      return NextResponse.redirect(url);
+    }
+  }
 
   // Ensure response cookies are available after supabase client initialization
   // by re-applying any set operations through the response object.

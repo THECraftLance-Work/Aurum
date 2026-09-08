@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
@@ -27,6 +28,7 @@ export default async function BookingsPage({
   const user = await requireUser();
   const supabase = await createSupabaseServer();
   const filters = await searchParams;
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
 
   const page = Math.max(1, Number(filters.page ?? 1) || 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -39,6 +41,8 @@ export default async function BookingsPage({
     )
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
+
+  if (projectId) query = query.eq("project_id", projectId);
 
   if (["SM", "CP"].includes(user.role)) query = query.eq("created_by", user.id);
   if (filters.status) query = query.eq("status", filters.status);

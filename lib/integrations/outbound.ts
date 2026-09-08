@@ -4,6 +4,7 @@ import { resolveRecipients } from "./recipients";
 import { whatsappEnv } from "./env";
 import { isEmail } from "./phone";
 import { normalizeContacts, type BookingContact } from "./contacts";
+import { buildBookingStatementPdf } from "./pdf";
 import {
   bookingWhatsAppParams,
   paymentWhatsAppParams,
@@ -16,6 +17,37 @@ import {
   buildOverdueEmail
 } from "./templates";
 import type { OutboundEvent } from "./types";
+
+async function statementAttachment(
+  bookingRef: string,
+  project: string,
+  unit: string,
+  customerName: string,
+  totalValue: number,
+  totalPaid: number,
+  remaining: number,
+  receipts: { no: string; date: string; mode: string; amount: number; ref?: string }[] = []
+): Promise<{ filename: string; base64: string } | null> {
+  try {
+    const brand = project.toLowerCase().includes("aurum") ? "AURUM" : project.toLowerCase().includes("tatva") ? "TATVA" : project.replace(/\s+/g, "_").toUpperCase();
+    const filename = `${brand}_Statement_${bookingRef}.pdf`;
+    const bytes = await buildBookingStatementPdf({
+      bookingRef,
+      project,
+      unit,
+      customerName,
+      totalValue,
+      totalPaid,
+      remaining,
+      receipts,
+    });
+    const base64 = Buffer.from(bytes).toString("base64");
+    return { filename, base64 };
+  } catch (e) {
+    console.error("[outbound] pdf generation failed", e);
+    return null;
+  }
+}
 
 /**
  * How long the customer "pending verification" note waits before sending, so a
@@ -97,6 +129,8 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
   if (event.key === "BOOKING_SUBMITTED") {
     const d = event.data;
     const mail = buildBookingEmail(d);
+    const attach = await statementAttachment(d.bookingRef, d.project, d.unit, d.customerName, d.totalValue, 0, d.totalValue, []);
+    const attachments = attach ? [{ filename: attach.filename, content: attach.base64, contentType: "application/pdf" }] : undefined;
     for (const to of rec.email) {
       rows.push({
         event_key: event.key,
@@ -105,7 +139,7 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         entity_type: "booking",
         entity_id: event.entityId,
         subject: mail.subject,
-        payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}` },
+        payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}`, attachments },
         dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
       });
     }
@@ -124,7 +158,8 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         payload: {
           html: customerMail.html,
           text: customerMail.text,
-          threadKey: `booking-${d.bookingUuid}`
+          threadKey: `booking-${d.bookingUuid}`,
+          attachments
         },
         dedupe_key: `BOOKING_CREATED_CUSTOMER:${event.entityId}:EMAIL:${person.email}`
       });
@@ -139,14 +174,35 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         entity_id: event.entityId,
         template_name: wa.templateBooking,
         payload: {
-          bodyParams: bookingWhatsAppParams(d),
-          urlButtonParam: bookingDeepLinkParam(d.bookingUuid)
+          bodyParams: bookingWhatsAppParams(d)
         },
         dedupe_key: `${event.key}:${event.entityId}:WHATSAPP:${to}`
       });
     }
   } else {
-    const d = event.data;
+    const d: any = event.data;
+    // Build statement PDF to attach – project-specific filename (AURUM/TATVA)
+    const paymentReceipt = [{
+      no: (d.reference ?? d.bookingRef ?? "").slice(0, 18) || d.bookingRef,
+      date: d.paymentDate ? new Date(d.paymentDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN"),
+      mode: d.mode ?? "ONLINE",
+      amount: d.amount ?? 0,
+      ref: d.reference ?? undefined,
+      bankName: d.mode ?? "Online Payment",
+      instrumentDate: d.paymentDate ?? new Date().toISOString().slice(0, 10),
+      instrumentNo: d.reference ? `BY TRANSFER-RTGS UTR NO: ${d.reference}` : "BY TRANSFER-RTGS UTR NO: HD",
+    }];
+    const payAttach = await statementAttachment(
+      d.bookingRef,
+      d.project ?? "Project",
+      d.unit ?? "",
+      d.customerName,
+      d.totalValue ?? d.amount + d.remainingBalance,
+      d.totalPaid ?? (d.totalValue ? d.totalValue - d.remainingBalance : d.amount),
+      d.remainingBalance,
+      paymentReceipt
+    );
+    const payAttachments = payAttach ? [{ filename: payAttach.filename, content: payAttach.base64, contentType: "application/pdf" }] : undefined;
 
     // Internal ops copy. Only for a newly recorded payment — a verification
     // decision is not something the ops list needs a second email about.
@@ -160,7 +216,7 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
           entity_type: "payment",
           entity_id: event.entityId,
           subject: mail.subject,
-          payload: { html: mail.html, text: mail.text },
+          payload: { html: mail.html, text: mail.text, attachments: payAttachments },
           dedupe_key: `${event.key}:${event.entityId}:EMAIL:${to}`
         });
       }
@@ -177,16 +233,16 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
       const suffix = event.key === "PAYMENT_REVIEWED" ? `:${d.decision}` : "";
 
       /**
-       * Hold the "payment recorded, pending verification" note briefly.
-       *
-       * Accountants often approve within a minute, and the customer was then
-       * getting two emails about one payment back to back — the first already
-       * obsolete. Delaying it means a quick approval produces exactly one
-       * email (the outcome), while a genuinely slow one still gets its
-       * acknowledgement. The review route cancels this row if it wins the race.
-       *
-       * The verification outcome always goes out immediately.
-       */
+        * Hold the "payment recorded, pending verification" note briefly.
+        *
+        * Accountants often approve within a minute, and the customer was then
+        * getting two emails about one payment back to back — the first already
+        * obsolete. Delaying it means a quick approval produces exactly one
+        * email (the outcome), while a genuinely slow one still gets its
+        * acknowledgement. The review route cancels this row if it wins the race.
+        *
+        * The verification outcome always goes out immediately.
+        */
       const holdMs = event.key === "PAYMENT_ADDED" ? PENDING_NOTE_HOLD_MS : 0;
 
       rows.push({
@@ -196,13 +252,14 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         entity_type: "payment",
         entity_id: event.entityId,
         subject: mail.subject,
-        payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}` },
+        payload: { html: mail.html, text: mail.text, threadKey: `booking-${d.bookingUuid}`, attachments: payAttachments },
         next_attempt_at: new Date(Date.now() + holdMs).toISOString(),
         dedupe_key: `${event.key}_CUSTOMER:${event.entityId}${suffix}:EMAIL:${person.email}`
       });
     }
 
     // WhatsApp goes to the internal ops list only, and only for new payments.
+    // Links removed per request – keep only bodyParams, no urlButtonParam
     for (const to of event.key === "PAYMENT_ADDED" ? rec.whatsapp : []) {
       rows.push({
         event_key: event.key,
@@ -212,8 +269,7 @@ export async function enqueueOutbound(event: OutboundEvent): Promise<{ ids: stri
         entity_id: event.entityId,
         template_name: wa.templatePayment,
         payload: {
-          bodyParams: paymentWhatsAppParams(d),
-          urlButtonParam: bookingDeepLinkParam(d.bookingUuid)
+          bodyParams: paymentWhatsAppParams(d)
         },
         dedupe_key: `${event.key}:${event.entityId}:WHATSAPP:${to}`
       });

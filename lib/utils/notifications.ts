@@ -8,6 +8,7 @@ type NotifInput = {
   entityType?: string;
   entityId?: string;
   priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  projectId?: string | null;
 };
 
 export async function sendNotification(n: NotifInput) {
@@ -19,7 +20,8 @@ export async function sendNotification(n: NotifInput) {
     message: n.message,
     entity_type: n.entityType,
     entity_id: n.entityId,
-    priority: n.priority ?? "NORMAL"
+    priority: n.priority ?? "NORMAL",
+    project_id: n.projectId ?? null
   });
 }
 
@@ -39,7 +41,8 @@ export async function notifyRole(role: "SM" | "CP" | "ACCOUNTANT" | "ADMIN" | "D
       message: n.message,
       entity_type: n.entityType,
       entity_id: n.entityId,
-      priority: n.priority ?? "NORMAL"
+      priority: n.priority ?? "NORMAL",
+      project_id: (n as any).projectId ?? null
     }))
   );
 }

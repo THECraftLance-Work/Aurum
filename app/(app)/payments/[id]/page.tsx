@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { reportMissedRecordAccess } from "@/lib/security/access-alert";
@@ -72,6 +73,13 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
   }
 
   const booking: any = Array.isArray(p.booking) ? p.booking[0] : p.booking;
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const ownerProjectId = (p as any).project_id ?? booking?.project_id ?? (booking as any)?.project_id ?? null;
+  // payment itself or its booking carries project_id – enforce isolation
+  if (projectId && ownerProjectId && ownerProjectId !== projectId) {
+    await reportMissedRecordAccess({ table: "payments", recordId: id, actor: user, path: `/payments/${id} (project_mismatch:${ownerProjectId}!=${projectId})` });
+    notFound();
+  }
   const dir = await resolveDirectory([p.submitted_by, p.reviewed_by]);
   const submitter = p.submitted_by ? dir.get(p.submitted_by) ?? null : null;
   const reviewer = p.reviewed_by ? dir.get(p.reviewed_by) ?? null : null;

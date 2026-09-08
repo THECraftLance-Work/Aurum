@@ -54,6 +54,7 @@ async function deliverOne(row: DeliveryRow): Promise<SendResult> {
     subject: row.subject ?? "Aurum Ops notification",
     html: row.payload?.html ?? "",
     text: row.payload?.text ?? "",
+    attachments: (row.payload as any)?.attachments ?? null,
     // Threads every notification about one booking into a single conversation.
     threadKey: row.payload?.threadKey ?? null
   });

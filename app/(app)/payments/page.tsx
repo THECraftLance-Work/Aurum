@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
@@ -11,6 +12,7 @@ import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import { ChevronRight } from "lucide-react";
 import ClickableRow from "@/components/ui/ClickableRow";
 import TabNav from "@/components/ui/TabNav";
+import BookingFilter from "@/components/payments/BookingFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +31,12 @@ const TABS = [
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; page?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string; booking?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
   const filters = await searchParams;
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
 
   const tab =
     TABS.find((t) => t.key === (filters.tab ?? "ALL")) ?? TABS[0];
@@ -45,7 +48,7 @@ export default async function PaymentsPage({
   let q = supabase
     .from("payments")
     .select(
-      "id, amount, payment_date, payment_mode, status, booking_id, submitted_by, booking:booking_id(booking_id, project_name)",
+      "id, amount, payment_date, payment_mode, status, booking_id, submitted_by, project_id, booking:booking_id(booking_id, project_name)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -53,6 +56,14 @@ export default async function PaymentsPage({
 
   if (["SM", "CP"].includes(user.role)) q = q.eq("submitted_by", user.id);
   if (tab.statuses.length) q = q.in("status", tab.statuses);
+  if (projectId) q = q.eq("project_id", projectId);
+  if (filters.booking) q = q.eq("booking_id", filters.booking);
+
+  // For booking filter dropdown — project-scoped
+  let bFilterQ: any = supabase.from("bookings").select("id, booking_id").order("created_at", { ascending: false }).limit(100);
+  if (["SM","CP"].includes(user.role)) bFilterQ = bFilterQ.eq("created_by", user.id);
+  if (projectId) bFilterQ = bFilterQ.eq("project_id", projectId);
+  const { data: filterBookings } = await bFilterQ;
 
   const { data: payments, count } = await q;
   const total = count ?? 0;
@@ -75,14 +86,17 @@ export default async function PaymentsPage({
         description="Every payment entry and its verification status. Open one for the full transaction record."
       />
 
-      <TabNav
-        tabs={TABS.map((t) => ({
-          key: t.key,
-          label: t.label,
-          href: href({ tab: t.key }),
-        }))}
-        active={tab.key}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <TabNav
+          tabs={TABS.map((t) => ({
+            key: t.key,
+            label: t.label,
+            href: href({ tab: t.key }),
+          }))}
+          active={tab.key}
+        />
+        <BookingFilter bookings={filterBookings ?? []} current={filters.booking} />
+      </div>
 
       <div className="card min-w-0 overflow-hidden p-0">
         {!payments || payments.length === 0 ? (

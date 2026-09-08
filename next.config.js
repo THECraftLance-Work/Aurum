@@ -25,6 +25,14 @@ const nextConfig = {
         }
       }
     : {}),
+  async rewrites() {
+    return [
+      { source: "/SRIVARAHA/project", destination: "/srivaraha/projects" },
+      { source: "/SRIVARAHA/projects", destination: "/srivaraha/projects" },
+      { source: "/SRIVARAHA/Projects", destination: "/srivaraha/projects" },
+      { source: "/srivaraha/project", destination: "/srivaraha/projects" }
+    ];
+  },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
     // Tree-shake barrel imports so a page importing 9 icons doesn't pull the

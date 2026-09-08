@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { X, CheckCheck, Inbox, Trash2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -19,7 +20,15 @@ type Notif = {
   created_at: string;
   entity_type: string | null;
   entity_id: string | null;
+  project_id?: string | null;
 };
+
+function getCurrentProjectId(): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1];
+  if (m) return decodeURIComponent(m);
+  try { return localStorage.getItem("srivaraha_project"); } catch { return null; }
+}
 
 function entityHref(n: Notif) {
   if (!n.entity_id) return null;
@@ -38,21 +47,48 @@ export default function NotificationsDrawer({
   const [loading, setLoading] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  useEffect(()=> setMounted(true), []);
+  useEffect(() => {
+    const refresh = () => setProjectId(getCurrentProjectId());
+    refresh();
+    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === "srivaraha_project") refresh(); };
+    const onCustom = () => refresh();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("srivaraha:project", onCustom as any);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("srivaraha:project", onCustom as any); };
+  }, []);
+  // Re-fetch when project changes while open
+  useEffect(() => {
+    const onProject = () => { if (open) setLoading(true); };
+    window.addEventListener("srivaraha:project", onProject as any);
+    return () => window.removeEventListener("srivaraha:project", onProject as any);
+  }, [open]);
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     (async () => {
-      const { data } = await supabase
+      const pid = getCurrentProjectId();
+      let q: any = supabase
         .from("notifications")
         .select("*")
         .eq("recipient_user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(25);
+      if (pid) q = q.eq("project_id", pid);
+      const { data } = await q;
+      // pid set → strictly that project's notifications (matches inbox/history semantics)
       setItems(data ?? []);
       setLoading(false);
     })();
-  }, [open, supabase, user.id]);
+  }, [open, supabase, user.id, projectId]);
 
   async function markAllRead() {
     const unread = items.filter((n) => !n.is_read);
@@ -105,15 +141,15 @@ export default function NotificationsDrawer({
     toast({ tone: "success", title: "All notifications cleared", description: `${data.length} removed.` });
   }
 
-  return (
+  const drawer = (
     <>
-      <div className={cn("fixed inset-0 z-40 transition", open ? "pointer-events-auto" : "pointer-events-none")}>
+      <div className={cn("fixed inset-0 z-50 transition", open ? "pointer-events-auto" : "pointer-events-none")}>
         <div
-          className={cn("absolute inset-0 bg-slate-900/40 transition-opacity duration-200", open ? "opacity-100" : "opacity-0")}
+          className={cn("absolute inset-0 bg-black/50 transition-opacity duration-200", open ? "opacity-100" : "opacity-0")}
           onClick={onClose}
         />
         <aside className={cn(
-          "absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-pop transition-transform duration-300 ease-out-quint",
+          "absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ease-out-quint",
           open ? "translate-x-0" : "translate-x-full"
         )}>
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -200,4 +236,7 @@ export default function NotificationsDrawer({
       />
     </>
   );
+
+  if (!mounted) return null;
+  return createPortal(drawer, document.body);
 }

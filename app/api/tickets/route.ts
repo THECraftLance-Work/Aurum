@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { notifyRole, writeAudit } from "@/lib/utils/notifications";
+import { sendNotification, notifyRole, writeAudit } from "@/lib/utils/notifications";
 
 const Body = z.object({
   subject: z.string().trim().min(3).max(160),
@@ -78,6 +78,17 @@ export async function POST(req: Request) {
       priority: "URGENT"
     });
   }
+
+  // Confirm to the employee themselves — appears in their Inbox + browser notification
+  await sendNotification({
+    recipientUserId: profile.id,
+    category: "TICKET",
+    title: "Ticket raised",
+    message: `Your ticket ${t.ticket_number} has been raised. Support will review it.`,
+    entityType: "ticket",
+    entityId: t.id,
+    priority: "NORMAL"
+  });
 
   await writeAudit({
     actorUserId: profile.id,

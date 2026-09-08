@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
@@ -21,17 +22,18 @@ export default async function AnalyticsPage({
   const { since, label } = resolveRange(rangeKey);
 
   const own = ["SM", "CP"].includes(user.role);
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
 
   // Server-side date filtering keeps the RSC payload small — this page used to
-  // ship two entire tables to the client.
-  let bq = supabase
+  // ship two entire tables to the client. Now project-scoped (Aurum vs Tatva).
+  let bq: any = supabase
     .from("bookings")
-    .select("id, project_name, status, total_property_value, total_amount_paid, remaining_balance, created_by, created_at")
+    .select("id, project_name, status, total_property_value, total_amount_paid, remaining_balance, created_by, created_at, project_id")
     .order("created_at", { ascending: false })
     .limit(2000);
-  let pq = supabase
+  let pq: any = supabase
     .from("payments")
-    .select("id, amount, payment_date, payment_mode, status, submitted_by")
+    .select("id, amount, payment_date, payment_mode, status, submitted_by, project_id")
     .order("payment_date", { ascending: false })
     .limit(4000);
 
@@ -43,14 +45,18 @@ export default async function AnalyticsPage({
     bq = bq.eq("created_by", user.id);
     pq = pq.eq("submitted_by", user.id);
   }
+  if (projectId) {
+    bq = bq.eq("project_id", projectId);
+    pq = pq.eq("project_id", projectId);
+  }
 
   const [{ data: bookings }, { data: payments }] = await Promise.all([bq, pq]);
 
   const rows = bookings ?? [];
   const totalBookings = rows.length;
-  const totalValue = rows.reduce((s, r: any) => s + Number(r.total_property_value ?? 0), 0);
-  const totalReceived = rows.reduce((s, r: any) => s + Number(r.total_amount_paid ?? 0), 0);
-  const pending = rows.reduce((s, r: any) => s + Number(r.remaining_balance ?? 0), 0);
+  const totalValue = rows.reduce((s: number, r: any) => s + Number(r.total_property_value ?? 0), 0);
+  const totalReceived = rows.reduce((s: number, r: any) => s + Number(r.total_amount_paid ?? 0), 0);
+  const pending = rows.reduce((s: number, r: any) => s + Number(r.remaining_balance ?? 0), 0);
   const collectionRate = totalValue > 0 ? Math.round((totalReceived / totalValue) * 100) : 0;
 
   return (

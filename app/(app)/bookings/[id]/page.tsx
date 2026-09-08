@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { reportMissedRecordAccess } from "@/lib/security/access-alert";
@@ -14,8 +15,10 @@ import AddBookingCustomer from "@/components/bookings/AddBookingCustomer";
 import InlineBookingEditor from "@/components/bookings/InlineBookingEditor";
 import { BookingEditProvider } from "@/components/bookings/BookingEditProvider";
 import HeaderEditControls from "@/components/bookings/HeaderEditControls";
+import CollapsibleCard from "@/components/ui/CollapsibleCard";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import ClickableRow from "@/components/ui/ClickableRow";
+import BookingStatementPdfButton from "@/components/bookings/BookingStatementPdfButton";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +45,16 @@ export default async function BookingDetail({
       recordId: id,
       actor: user,
       path: `/bookings/${id}`
+    });
+    notFound();
+  }
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  if (projectId && (b as any).project_id && (b as any).project_id !== projectId) {
+    await reportMissedRecordAccess({
+      table: "bookings",
+      recordId: id,
+      actor: user,
+      path: `/bookings/${id} (project_mismatch:${(b as any).project_id}!=${projectId})`
     });
     notFound();
   }
@@ -134,7 +147,7 @@ export default async function BookingDetail({
 
   return (
     <BookingEditProvider booking={editBooking}>
-      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 xl:-mx-8 border-b border-slate-200 bg-[#f8fafc]/95 px-3 sm:px-6 xl:px-8 py-0 backdrop-blur shrink-0">
+      <div className="sticky top-0 z-10 -mx-3 sm:-mx-6 xl:-mx-8 -mt-6 border-b border-slate-200 bg-white/90 px-3 sm:px-6 xl:px-8 py-0 backdrop-blur supports-[backdrop-filter]:bg-white/80 shrink-0">
         <PageHeader
           title={b.booking_id}
           description={`${b.project_name} · Unit ${b.unit_number}`}
@@ -143,6 +156,29 @@ export default async function BookingDetail({
               <Link href="/bookings" className="btn-secondary h-10">
                 Back
               </Link>
+              <BookingStatementPdfButton
+                bookingRef={b.booking_id}
+                project={b.project_name}
+                subProjectName={(b as any).block ? `BLOCK ${(b as any).block}` : (b as any).sub_project_name ?? b.project_name}
+                unit={b.unit_number}
+                sft={(b as any).saleable_area ?? (b as any).carpet_area ?? ""}
+                bookingDate={(b as any).booking_date ?? b.created_at}
+                customerName={people[0]?.customer?.name ?? customer?.name ?? "Customer"}
+                coApplicantName={people.find((pe: any) => !pe.is_primary)?.customer?.name ?? null}
+                totalValue={Number(b.total_property_value ?? 0)}
+                totalPaid={Number(b.total_amount_paid ?? 0)}
+                remaining={Number(b.remaining_balance ?? 0)}
+                receipts={(payments ?? []).map((p: any, idx: number) => ({
+                  no: `${idx + 322} / ${p.id.slice(0, 6)}`,
+                  date: formatDate(p.payment_date),
+                  mode: p.payment_mode,
+                  bankName: p.payment_mode === "BANK_TRANSFER" ? "Online Payment" : p.payment_mode,
+                  instrumentDate: formatDate(p.payment_date),
+                  instrumentNo: p.reference_no ? `BY TRANSFER-RTGS UTR NO: ${p.reference_no}` : "BY TRANSFER-RTGS UTR NO: HD",
+                  amount: Number(p.amount ?? 0),
+                  ref: p.reference_no ?? undefined,
+                }))}
+              />
               {canEdit && <HeaderEditControls />}
               <StatusBadge status={b.status} />
             </div>
@@ -152,13 +188,15 @@ export default async function BookingDetail({
 
       <div className="grid gap-4 xl:grid-cols-3 items-start xl:h-[calc(100vh-160px)] xl:overflow-hidden pt-2">
         <div className="xl:col-span-2 space-y-4 xl:h-[calc(100vh-160px)] xl:overflow-y-auto xl:overscroll-contain xl:pr-2 pb-24 xl:pb-6">
-            <div className="card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Customers
-                </h3>
-                {canAddPayment && <AddBookingCustomer bookingId={b.id} />}
+            <CollapsibleCard title="Financial" defaultOpen={true}>
+              <div className="grid grid-cols-3 gap-4">
+                <Stat label="Total value" value={formatINR(b.total_property_value)} />
+                <Stat label="Total paid" value={formatINR(b.total_amount_paid)} tone="emerald" />
+                <Stat label="Remaining" value={formatINR(b.remaining_balance)} tone="amber" />
               </div>
+            </CollapsibleCard>
+
+            <CollapsibleCard title="Customers" right={canAddPayment ? <AddBookingCustomer bookingId={b.id} /> : undefined}>
               <div className="space-y-3">
                 {(people.length
                   ? people
@@ -250,15 +288,12 @@ export default async function BookingDetail({
                   </div>
                 ))}
               </div>
-            </div>
+            </CollapsibleCard>
 
             <InlineBookingEditor booking={editBooking} />
 
             {(b.bank_name || b.bank_account_number || b.loan_sanctioned) && (
-              <div className="card p-5">
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">
-                  Bank details
-                </h3>
+              <CollapsibleCard title="Bank details">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <Info label="Bank" value={b.bank_name ?? "—"} />
                   <Info label="Branch" value={b.bank_branch ?? "—"} />
@@ -280,40 +315,10 @@ export default async function BookingDetail({
                     }
                   />
                 </div>
-              </div>
+              </CollapsibleCard>
             )}
 
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">
-                Financial
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                <Stat
-                  label="Total value"
-                  value={formatINR(b.total_property_value)}
-                />
-                <Stat
-                  label="Total paid"
-                  value={formatINR(b.total_amount_paid)}
-                  tone="emerald"
-                />
-                <Stat
-                  label="Remaining"
-                  value={formatINR(b.remaining_balance)}
-                  tone="amber"
-                />
-              </div>
-            </div>
-
-            <div className="card p-0 overflow-hidden">
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Payment history
-                </h3>
-                <span className="text-xs text-slate-500">
-                  {payments?.length ?? 0} entries
-                </span>
-              </div>
+            <CollapsibleCard title="Payment history" right={<span className="text-xs text-slate-500">{payments?.length ?? 0} entries</span>}>
               {(payments?.length ?? 0) === 0 ? (
                 <div className="p-6 text-sm text-slate-500">
                   No payments recorded.
@@ -392,12 +397,9 @@ export default async function BookingDetail({
                   </table>
                 </div>
               )}
-            </div>
+            </CollapsibleCard>
 
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">
-                History
-              </h3>
+            <CollapsibleCard title="History">
               {(history?.length ?? 0) === 0 ? (
                 <div className="text-sm text-slate-500">No activity yet.</div>
               ) : (
@@ -423,7 +425,7 @@ export default async function BookingDetail({
                   ))}
                 </ol>
               )}
-            </div>
+            </CollapsibleCard>
           </div>
 
           <aside className="space-y-4 self-start xl:h-[calc(100vh-100px)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1 pb-24">

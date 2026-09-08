@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
@@ -9,12 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function InboxPage() {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
-  const { data: notifications } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("recipient_user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  let q: any = supabase.from("notifications").select("*").eq("recipient_user_id", user.id).order("created_at", { ascending: false }).limit(200);
+  if (projectId) q = q.eq("project_id", projectId);
+  const { data: notifications } = await q;
 
   return (
     <>

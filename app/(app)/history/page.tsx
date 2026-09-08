@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import PageHeader from "@/components/ui/PageHeader";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function HistoryPage() {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
+  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
   const own = ["SM","CP"].includes(user.role);
 
   /**
@@ -25,33 +27,21 @@ export default async function HistoryPage() {
    */
   const WINDOW = 200;
 
-  const bq = own
-    ? supabase.from("bookings")
-        .select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false })
-        .limit(WINDOW)
-    : supabase.from("bookings")
-        .select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason")
-        .order("created_at", { ascending: false })
-        .limit(WINDOW);
+  let bq: any = own
+    ? supabase.from("bookings").select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason, project_id").eq("created_by", user.id)
+    : supabase.from("bookings").select("id, booking_id, project_name, unit_number, status, total_property_value, total_amount_paid, created_at, updated_at, submitted_at, approved_at, rejection_reason, project_id");
+  if (projectId) bq = bq.eq("project_id", projectId);
+  bq = bq.order("created_at", { ascending: false }).limit(WINDOW);
 
-  const pq = own
-    ? supabase.from("payments")
-        .select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, booking:booking_id(booking_id)")
-        .eq("submitted_by", user.id)
-        .order("created_at", { ascending: false })
-        .limit(WINDOW)
-    : supabase.from("payments")
-        .select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, booking:booking_id(booking_id)")
-        .order("created_at", { ascending: false })
-        .limit(WINDOW);
+  let pq: any = supabase.from("payments").select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, project_id, booking:booking_id(booking_id)").eq("submitted_by", user.id);
+  if (!own) pq = supabase.from("payments").select("id, booking_id, amount, payment_date, payment_mode, status, created_at, reviewed_at, rejection_reason, project_id, booking:booking_id(booking_id)");
+  else pq = pq.eq("submitted_by", user.id);
+  if (projectId) pq = pq.eq("project_id", projectId);
+  pq = pq.order("created_at", { ascending: false }).limit(WINDOW);
 
-  const nq = supabase.from("notifications")
-    .select("id, category, title, message, entity_type, entity_id, created_at, priority")
-    .eq("recipient_user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(WINDOW);
+  let nq: any = supabase.from("notifications").select("id, category, title, message, entity_type, entity_id, created_at, priority, project_id").eq("recipient_user_id", user.id);
+  if (projectId) nq = nq.eq("project_id", projectId);
+  nq = nq.order("created_at", { ascending: false }).limit(WINDOW);
 
   const [{ data: bookings }, { data: payments }, { data: notifs }] = await Promise.all([bq, pq, nq]);
 

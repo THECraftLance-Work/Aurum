@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -24,7 +25,16 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
-  const { customer, customers, booking, initialPayment, previousPayments, attachment } = body ?? {};
+  const { customer, customers, booking, initialPayment, previousPayments, attachment, project_id: bodyProjectId } = body ?? {};
+  const jar = await cookies();
+  const projectId = (bodyProjectId as string | undefined) ?? jar.get("srivaraha_project")?.value ?? null;
+  // If no project selected, default to Aurum for backward compat, or require selection for new data
+  let effectiveProjectId: string | null = projectId;
+  if (!effectiveProjectId) {
+    const adminTmp = createSupabaseAdmin();
+    const { data: aurum } = await adminTmp.from("projects").select("id").eq("slug", "aurum").maybeSingle();
+    effectiveProjectId = aurum?.id ?? null;
+  }
 
   const customerList = Array.isArray(customers) && customers.length ? customers : [customer];
   if (!booking || typeof booking !== "object") {
@@ -126,6 +136,7 @@ export async function POST(req: Request) {
       cp_rera_id: booking.cp_rera_id ?? null,
       payment_source: booking.payment_source ?? null,
       purchase_purpose: booking.purchase_purpose ?? null,
+      project_id: effectiveProjectId,
       status: "SUBMITTED",
       created_by: profile.id,
       creator_role: profile.role,

@@ -357,7 +357,6 @@ const CUSTOMER_FOOTER =
 // ---------------------------------------------------------------------------
 
 export function buildBookingEmail(d: BookingAlertData) {
-  const href = `${appUrl()}/bookings/${d.bookingUuid}`;
   const others = (d.contacts ?? []).filter((c) => !c.isPrimary);
   return {
     subject: `Booking ${d.bookingRef} submitted for verification — ${d.project} / ${d.unit}`,
@@ -391,15 +390,13 @@ export function buildBookingEmail(d: BookingAlertData) {
           ]
         }
       ],
-      cta: { href, label: "Open verification queue" },
-      outro: ["Please review the submitted documents and payment proof before approving."],
+      outro: ["Please review the attached Statement of Accounts PDF. No link is included."],
       footerReason: OPS_FOOTER
     })
   };
 }
 
 export function buildPaymentEmail(d: PaymentAlertData) {
-  const href = `${appUrl()}/bookings/${d.bookingUuid}`;
   return {
     subject: `Payment of ${money(d.amount)} on ${d.bookingRef} awaiting verification`,
     ...renderEmail({
@@ -434,7 +431,7 @@ export function buildPaymentEmail(d: PaymentAlertData) {
           rows: [["Outstanding", money(d.remainingBalance)]]
         }
       ],
-      cta: { href, label: "Review this payment" },
+      outro: ["The updated Statement of Accounts PDF is attached. No link is included."],
       footerReason: OPS_FOOTER
     })
   };
@@ -508,7 +505,6 @@ export function buildBookingCreatedEmail(
   recipientName?: string,
   recipientEmail?: string
 ) {
-  const href = `${appUrl()}/b/${d.bookingUuid}`;
   return {
     subject: `Booking ${d.bookingRef} confirmed — ${d.project}, Unit ${d.unit}`,
     ...renderEmail({
@@ -548,11 +544,10 @@ export function buildBookingCreatedEmail(
       callout: {
         tone: "neutral",
         title: "What happens next",
-        text: "Our accounts team is verifying the details and documents submitted with this booking. We will email you as soon as verification is complete, and again each time a payment is recorded or verified."
+        text: "Our accounts team is verifying the details and documents submitted with this booking. Your statement of accounts is attached as PDF."
       },
-      cta: { href, label: "View your booking" },
       outro: [
-        "The link above opens your live booking record: payments received, outstanding balance and the documents on file. It needs no password, so please treat it as confidential."
+        "The PDF attached contains your booking record, payments received, outstanding balance and schedule. Please keep it for your records."
       ],
       signoff: `With thanks,\n${BRAND.name}`,
       footerReason: CUSTOMER_FOOTER
@@ -566,7 +561,6 @@ export function buildPaymentReceivedCustomerEmail(
   recipientName?: string,
   recipientEmail?: string
 ) {
-  const href = `${appUrl()}/b/${d.bookingUuid}`;
   return {
     subject: `Payment of ${money(d.amount)} received against ${d.bookingRef}`,
     ...renderEmail({
@@ -602,11 +596,10 @@ export function buildPaymentReceivedCustomerEmail(
       callout: {
         tone: "warning",
         title: "Not yet credited",
-        text: "This amount is not reflected in your paid total until our accounts team verifies it. You will receive a confirmation email the moment that happens, usually within one working day."
+        text: "This amount is not reflected in your paid total until our accounts team verifies it. Your updated statement is attached."
       },
-      cta: { href, label: "View booking and receipts" },
       outro: [
-        "If you did not make this payment, please contact your sales representative immediately."
+        "If you did not make this payment, please contact your sales representative immediately. The PDF statement is attached."
       ],
       signoff: `With thanks,\n${BRAND.name}`,
       footerReason: CUSTOMER_FOOTER
@@ -620,7 +613,6 @@ export function buildPaymentReviewedCustomerEmail(
   recipientName?: string,
   recipientEmail?: string
 ) {
-  const href = `${appUrl()}/b/${d.bookingUuid}`;
   const approved = d.decision === "APPROVED";
   const greeting = `Dear ${firstName(recipientName ?? d.customerName)},`;
   const others = otherPartiesRow(d, recipientEmail);
@@ -674,14 +666,14 @@ export function buildPaymentReviewedCustomerEmail(
           ? {
               tone: "positive",
               title: "Your balance is now clear",
-              text: "There is no outstanding amount on this booking. Your sales representative will be in touch about the next steps."
+              text: "There is no outstanding amount on this booking. Your statement is attached."
             }
           : {
               tone: "neutral",
               title: "Outstanding balance",
-              text: `${money(d.remainingBalance)} remains payable on this booking. Please contact your sales representative to arrange the next instalment.`
+              text: `${money(d.remainingBalance)} remains payable. Your updated statement is attached.`
             },
-        cta: { href, label: "View booking and receipts" },
+        outro: ["The PDF statement is attached for your records."],
         signoff: `With thanks,\n${BRAND.name}`,
         footerReason: CUSTOMER_FOOTER
       })
@@ -726,9 +718,8 @@ export function buildPaymentReviewedCustomerEmail(
           ? d.rejectionReason
           : "Please contact your sales representative with your payment reference so we can trace it."
       },
-      cta: { href, label: "View booking and receipts" },
       outro: [
-        "No action is needed on this email itself. Please speak to your sales representative, who can resolve this with our accounts team."
+        "No action is needed on this email itself. Please speak to your sales representative."
       ],
       signoff: `With thanks,\n${BRAND.name}`,
       footerReason: CUSTOMER_FOOTER
@@ -741,7 +732,6 @@ export function buildPaymentReviewedCustomerEmail(
 // ---------------------------------------------------------------------------
 
 export function buildOverdueEmail(d: OverdueAlertData) {
-  const href = `${appUrl()}/bookings/${d.bookingUuid}`;
   const weeks = Math.floor(d.daysOverdue / 7);
   const period =
     d.daysOverdue >= 60
@@ -806,9 +796,9 @@ export function buildOverdueEmail(d: OverdueAlertData) {
             title: "What we need from you",
             text: "Call the customer, agree a payment date, and record the payment on the booking as soon as it is made. This reminder will repeat until the balance is cleared."
           },
-      cta: { href, label: "Open the booking" },
       outro: [
-        "Customer contact details are shown above for follow-up only. Do not forward this email outside the organisation."
+        "Customer contact details are shown above for follow-up only. Do not forward this email outside the organisation. The Statement PDF is attached.",
+        "No booking link is included in this email."
       ],
       signoff: `— ${BRAND.product}`,
       footerReason:

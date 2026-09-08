@@ -98,6 +98,27 @@ export default function NewBookingForm({ role }: { role: string }) {
       setSaveData(localStorage.getItem("new-booking-save-data") === "on");
     } catch { /* Browser storage is optional. */ }
     setDraftReady(true);
+    // Prefill Sale consideration & areas from admin defaults for current project
+    try {
+      const pid = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)![1]) : localStorage.getItem("srivaraha_project");
+      if (pid) {
+        fetch("/api/projects").then(r=>r.json()).then(j=>{
+          const proj = (j.projects ?? []).find((p:any)=> p.id===pid);
+          if (proj) {
+            const areas = proj.default_areas ?? {};
+            setForm(f=> ({
+              ...f,
+              saleable_area: f.saleable_area || (areas.saleable_area ? String(areas.saleable_area) : f.saleable_area),
+              carpet_area: f.carpet_area || (areas.carpet_area ? String(areas.carpet_area) : f.carpet_area),
+              external_walls_area: f.external_walls_area || (areas.external_walls_area ? String(areas.external_walls_area) : f.external_walls_area),
+              balcony_utility_area: f.balcony_utility_area || (areas.balcony_utility_area ? String(areas.balcony_utility_area) : f.balcony_utility_area),
+              common_area: f.common_area || (areas.common_area ? String(areas.common_area) : f.common_area),
+              sale_consideration_per_sqft: f.sale_consideration_per_sqft || (proj.default_sale_consideration ? String(proj.default_sale_consideration) : f.sale_consideration_per_sqft),
+            }));
+          }
+        }).catch(()=>{});
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -153,10 +174,12 @@ export default function NewBookingForm({ role }: { role: string }) {
     if (!validation.valid) { setError(validation.message); return; }
     setBusy(true);
     setError(null);
+    const project_id = typeof document !== "undefined" ? (document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)![1]) : localStorage.getItem("srivaraha_project")) : null;
     const res = await fetch("/api/bookings", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        project_id,
         customers: customers.map((c) => ({
           ...c,
           name: c.name.trim(),
@@ -733,10 +756,16 @@ function Section({
   title: string;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="card p-5">
-      <h3 className="text-sm font-semibold text-slate-900 mb-4">{title}</h3>
-      {children}
+    <div className="card p-0 overflow-hidden">
+      <button type="button" onClick={() => setOpen(v=>!v)} className="flex w-full items-center justify-between px-5 py-4 hover:bg-slate-50">
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <svg className={`h-4 w-4 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div className={`grid transition-all ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+        <div className="overflow-hidden px-5 pb-5">{children}</div>
+      </div>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { SessionUser } from "@/lib/auth/session";
 import { cn } from "@/lib/utils/cn";
 import { roleAccent, roleLabels } from "@/lib/utils/format";
 import {
   LayoutDashboard, ClipboardList, Wallet, Inbox, BarChart3,
-  ShieldCheck, UserCog, Users, ScrollText, Settings, X, History, Building2, User, LifeBuoy, MoreHorizontal, ChevronUp
+  ShieldCheck, UserCog, Users, ScrollText, Settings, X, History, Building2, User, LifeBuoy, MoreHorizontal, ChevronUp, ChevronDown
 } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<any>; roles: SessionUser["role"][] };
@@ -38,6 +39,36 @@ export default function Sidebar({
   pendingVerification?: number;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [projects, setProjects] = useState<any[]>([]);
+  const [currentProject, setCurrentProject] = useState<string>("");
+  const [projectOpen, setProjectOpen] = useState(false);
+  const refreshProject = () => {
+    const c = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1];
+    const val = c ? decodeURIComponent(c) : (typeof window !== "undefined" ? localStorage.getItem("srivaraha_project") ?? "" : "");
+    setCurrentProject(val);
+  };
+  useEffect(() => {
+    fetch("/api/projects").then(r=>r.json()).then(j=> setProjects(j.projects ?? [])).catch(()=>{});
+    refreshProject();
+    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === "srivaraha_project") refreshProject(); };
+    const onCustom = () => refreshProject();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("srivaraha:project", onCustom as any);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("srivaraha:project", onCustom as any); };
+  }, []);
+  function selectProject(id: string) {
+    document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=31536000`;
+    localStorage.setItem("srivaraha_project", id);
+    setCurrentProject(id);
+    setProjectOpen(false);
+    window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: id }));
+    window.dispatchEvent(new StorageEvent("storage", { key: "srivaraha_project", newValue: id } as any));
+    router.refresh();
+  }
+  const filteredProjects = projects.filter((p:any)=> p.slug !== "sri-varaha");
+  const isPrivileged = ["ADMIN","DIRECTOR"].includes(user.role);
+  const currentProjectName = currentProject ? (filteredProjects.find((p:any)=>p.id===currentProject)?.name ?? "All Projects") : isPrivileged ? "All Projects" : "Select project";
   const accent = roleAccent[user.role];
   const items = NAV.filter((i) => i.roles.includes(user.role));
   const primaryItems = items.slice(0, 4);
@@ -45,17 +76,42 @@ export default function Sidebar({
 
   const content = (
     <div className="flex h-full w-72 flex-col bg-white border-r border-border">
-      <div className="flex items-center justify-between px-5 py-5">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white text-sm font-bold shadow-card">
-            <Building2 className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold leading-tight text-slate-900">Aurum Real Estate</div>
-            <div className="text-[11px] leading-tight text-slate-500">Operations</div>
-          </div>
-        </Link>
-        <button className="lg:hidden p-2 rounded-lg hover:bg-slate-100" onClick={onMobileClose}>
+      <div className="flex items-center justify-between px-2 py-5 gap-2">
+        <div className="relative flex-1">
+          <button onClick={()=> setProjectOpen(v=>!v)} className="flex w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-900 px-3 py-2.5 text-left hover:bg-slate-800 transition-colors">
+            <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-white shrink-0">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold leading-tight text-white truncate">{projects.find(p=>p.id===currentProject)?.name ?? "Aurum Real Estate"}</div>
+              <div className="text-[11px] leading-tight text-white/70 truncate">{currentProject ? "SRI VARAHA / Projects" : "Operations"} • {currentProjectName}</div>
+            </div>
+            <ChevronDown className={`h-4 w-4 text-white/70 shrink-0 transition-transform ${projectOpen ? "rotate-180" : ""}`} />
+          </button>
+          {projectOpen && (
+            <div className="absolute left-0 right-0 top-full z-40 mt-2 rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+              <div className="max-h-64 overflow-y-auto py-1">
+                {isPrivileged && (
+                  <button onClick={()=> { document.cookie = `srivaraha_project=; path=/; max-age=0`; localStorage.removeItem("srivaraha_project"); setCurrentProject(""); setProjectOpen(false); router.refresh(); }} className={`flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-50 ${!currentProject ? "bg-red-50 text-[#ec3013] font-medium" : "text-slate-700"}`}>
+                    <span className="truncate">All Projects <span className="ml-1 text-xs text-slate-400">Sri Varaha</span></span>
+                    {!currentProject && <span className="h-2 w-2 rounded-full bg-[#ec3013]" />}
+                  </button>
+                )}
+                {filteredProjects.length===0 && <div className="px-3 py-2 text-xs text-slate-500">No projects</div>}
+                {filteredProjects.map((p:any)=>(
+                  <button key={p.id} onClick={()=> selectProject(p.id)} className={`flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-50 ${currentProject===p.id ? "bg-red-50 text-[#ec3013] font-medium" : "text-slate-700"}`}>
+                    <span className="truncate">{p.name}<span className="ml-1 text-xs text-slate-400">{p.slug}</span></span>
+                    {currentProject===p.id && <span className="h-2 w-2 rounded-full bg-[#ec3013]" />}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-slate-200 p-2">
+                <Link href="/projects" onClick={()=> setProjectOpen(false)} className="block rounded-lg bg-slate-900 px-3 py-2 text-center text-xs font-medium text-white hover:bg-slate-800">Manage Projects</Link>
+              </div>
+            </div>
+          )}
+        </div>
+        <button className="lg:hidden p-2 rounded-lg hover:bg-slate-100 shrink-0" onClick={onMobileClose}>
           <X className="h-5 w-5" />
         </button>
       </div>
