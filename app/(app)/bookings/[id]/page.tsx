@@ -11,7 +11,7 @@ import { formatDate, formatDateTime, formatINR } from "@/lib/utils/format";
 import { resolveDirectory, displayUser } from "@/lib/utils/directory";
 import AddPaymentForm from "@/components/payments/AddPaymentForm";
 import ReviewActions from "@/components/bookings/ReviewActions";
-import AddBookingCustomer from "@/components/bookings/AddBookingCustomer";
+// import AddBookingCustomer from "@/components/bookings/AddBookingCustomer";
 import InlineBookingEditor from "@/components/bookings/InlineBookingEditor";
 import { BookingEditProvider } from "@/components/bookings/BookingEditProvider";
 import HeaderEditControls from "@/components/bookings/HeaderEditControls";
@@ -198,7 +198,7 @@ export default async function BookingDetail({
               </div>
             </CollapsibleCard>
 
-            <CollapsibleCard title="Customers" right={canAddPayment ? <AddBookingCustomer bookingId={b.id} /> : undefined}>
+            <CollapsibleCard title="Customers">
               <div className="space-y-3">
                 {(people.length
                   ? people
