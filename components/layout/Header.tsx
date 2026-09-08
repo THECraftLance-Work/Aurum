@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, LifeBuoy } from "lucide-react";
+import { Bell, LogOut, LifeBuoy, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import type { SessionUser } from "@/lib/auth/session";
@@ -8,16 +8,19 @@ import GlobalSearch from "./GlobalSearch";
 import NotificationsDrawer from "@/components/notifications/NotificationsDrawer";
 import RaiseTicketModal from "@/components/tickets/RaiseTicketModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
 import { isNotificationCategoryEnabled, playNotificationSound, showBrowserNotification } from "@/lib/utils/notification-client";
 
 export default function Header({ user }: { user: SessionUser }) {
   const router = useRouter();
   const supabase = createSupabaseBrowser();
+  const { toast } = useToast();
   const [unread, setUnread] = useState(0);
   const [drawer, setDrawer] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [reloading, setReloading] = useState(false);
 
   function getCurrentProjectId(): string | null {
     const m = document.cookie.match(/(?:^|; )srivaraha_project=([^;]*)/)?.[1];
@@ -71,6 +74,18 @@ export default function Header({ user }: { user: SessionUser }) {
     router.replace("/login");
   }
 
+  function handleReload() {
+    if (reloading) return;
+    setReloading(true);
+    toast({ title: "Reloading…", description: "Refreshing data", tone: "info", duration: 2000 });
+    router.refresh();
+    // silent reload — revalidates server components without hard navigation
+    window.setTimeout(() => {
+      setReloading(false);
+      toast({ title: "Reloaded", description: "Data is up to date", tone: "success" });
+    }, 800);
+  }
+
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-border bg-white/95 backdrop-blur">
@@ -96,6 +111,16 @@ export default function Header({ user }: { user: SessionUser }) {
             >
               <LifeBuoy className="h-4 w-4 text-slate-600" />
               <span className="hidden text-xs font-semibold text-slate-700 xl:inline">Raise a Ticket</span>
+            </button>
+
+            <button
+              onClick={handleReload}
+              disabled={reloading}
+              className="relative rounded-xl border border-border bg-white p-2.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
+              aria-label="Reload"
+              title="Reload"
+            >
+              <RefreshCw className={`h-4 w-4 text-slate-600 ${reloading ? "animate-spin" : ""}`} />
             </button>
 
             <button

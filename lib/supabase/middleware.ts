@@ -71,16 +71,42 @@ export async function updateSession(request: NextRequest) {
   );
   const { data: { user } } = await supabase.auth.getUser();
 
-  // First-login project picker: if authenticated and no project selected, force SRIVARAHA/Projects
+  // First-login project picker: show only once. After user picks once we set
+  // srivaraha_onboarded=1 (10y). Subsequent logins must not force the picker.
+  // ADMIN/DIRECTOR are allowed All Projects (no cookie).
   if (user) {
     const hasProject = request.cookies.has("srivaraha_project");
+    const rawVal = request.cookies.get("srivaraha_project")?.value ?? "";
+    const hasValidProject = hasProject && rawVal.trim() !== "";
+    const hasOnboarded = request.cookies.has("srivaraha_onboarded");
     const path = request.nextUrl.pathname;
     const isProjectPage = path.startsWith("/srivaraha") || path === "/projects" || path.startsWith("/projects/");
     const isApiOrAuth = path.startsWith("/api") || path.startsWith("/auth") || path.startsWith("/login") || path.startsWith("/register") || path.startsWith("/pending");
-    if (!hasProject && !isProjectPage && !isApiOrAuth && (path === "/" || path === "/dashboard")) {
+    // "/" after login: only first time (no onboarded flag) forces picker
+    if (!hasValidProject && !hasOnboarded && !isProjectPage && !isApiOrAuth && path === "/") {
       const url = request.nextUrl.clone();
       url.pathname = "/srivaraha/projects";
       return NextResponse.redirect(url);
+    }
+    // "/" already onboarded but no project cookie (e.g. cleared): send to dashboard, let pages handle fallback
+    if (!hasValidProject && hasOnboarded && !isProjectPage && !isApiOrAuth && path === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    // "/dashboard" without project: first time non-privileged must pick, afterwards show dashboard
+    if (!hasValidProject && !isProjectPage && !isApiOrAuth && path === "/dashboard") {
+      if (hasOnboarded) {
+        return NextResponse.next({ request });
+      }
+      const { data: profile } = await supabase.from("app_users").select("role").eq("id", user.id).maybeSingle();
+      const role = (profile as any)?.role as string | undefined;
+      const isPrivileged = role === "ADMIN" || role === "DIRECTOR";
+      if (!isPrivileged) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/srivaraha/projects";
+        return NextResponse.redirect(url);
+      }
     }
   }
 

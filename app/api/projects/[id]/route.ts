@@ -39,7 +39,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const admin = createSupabaseAdmin();
   const { data: proj } = await admin.from("projects").select("id, slug, name").eq("id", id).maybeSingle();
   if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (String(slug).trim() !== proj.slug) return NextResponse.json({ error: "Slug mismatch — type the exact project slug" }, { status: 400 });
+  if (String(slug).trim().toLowerCase() !== proj.slug.toLowerCase()) return NextResponse.json({ error: "Slug mismatch — type the exact project slug" }, { status: 400 });
   if (String(confirmText).trim() !== "DELETE") return NextResponse.json({ error: "Type DELETE to confirm" }, { status: 400 });
 
   const { data: fullProfile } = await admin.from("app_users").select("auth_provider, email").eq("id", profile.id).maybeSingle();

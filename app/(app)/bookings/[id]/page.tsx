@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { reportMissedRecordAccess } from "@/lib/security/access-alert";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -48,15 +48,19 @@ export default async function BookingDetail({
     });
     notFound();
   }
-  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
   if (projectId && (b as any).project_id && (b as any).project_id !== projectId) {
+    // Project switch while on detail: don't confuse user with 404. Just reload
+    // to the bookings list (which is already filtered to the new project).
+    // Keep the access alert for audit but redirect instead of notFound().
     await reportMissedRecordAccess({
       table: "bookings",
       recordId: id,
       actor: user,
       path: `/bookings/${id} (project_mismatch:${(b as any).project_id}!=${projectId})`
     });
-    notFound();
+    redirect("/bookings");
   }
 
   // PostgREST types an embedded to-one relation as an array. (The old
@@ -147,13 +151,15 @@ export default async function BookingDetail({
 
   return (
     <BookingEditProvider booking={editBooking}>
-      <div className="sticky top-0 z-10 -mx-3 sm:-mx-6 xl:-mx-8 -mt-6 border-b border-slate-200 bg-white/90 px-3 sm:px-6 xl:px-8 py-0 backdrop-blur supports-[backdrop-filter]:bg-white/80 shrink-0">
+      <div className="sticky -top-6 z-30 -mx-3 sm:-mx-6 xl:-mx-8 -mt-6 border-b border-slate-200 bg-white px-3 sm:px-6 xl:px-8 py-3 shadow-sm isolate">
         <PageHeader
+          compact
+          className="py-1"
           title={b.booking_id}
           description={`${b.project_name} · Unit ${b.unit_number}`}
           actions={
-            <div className="flex items-center gap-2">
-              <Link href="/bookings" className="btn-secondary h-10">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/bookings" className="btn-secondary h-9">
                 Back
               </Link>
               <BookingStatementPdfButton
@@ -186,9 +192,9 @@ export default async function BookingDetail({
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3 items-start xl:h-[calc(100vh-160px)] xl:overflow-hidden pt-2">
-        <div className="xl:col-span-2 space-y-4 xl:h-[calc(100vh-160px)] xl:overflow-y-auto xl:overscroll-contain xl:pr-2 pb-24 xl:pb-6">
-            <CollapsibleCard title="Financial" defaultOpen={true}>
+      <div className="relative isolate -mx-3 sm:-mx-6 xl:-mx-8 px-3 sm:px-6 xl:px-8 grid gap-4 xl:grid-cols-3 items-start pt-6">
+        <div className="xl:col-span-2 space-y-4 min-w-0">
+            <CollapsibleCard title="Financial" collapsible={false}>
               <div className="grid grid-cols-3 gap-4">
                 <Stat label="Total value" value={formatINR(b.total_property_value)} />
                 <Stat label="Total paid" value={formatINR(b.total_amount_paid)} tone="emerald" />
@@ -324,12 +330,13 @@ export default async function BookingDetail({
                   No payments recorded.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="max-h-[232px] overflow-y-auto overflow-x-auto overscroll-contain">
                   {/*
                   table-fixed + colgroup: without explicit widths the review
                   buttons pushed the table past the card and clipped the last
                   column. Verification lives in the Verification Queue and on
                   the payment page — this table is a read-only ledger.
+                  Capped to 4 rows (~58px each) + header so scrollbar appears after 4 entries.
                 */}
                   <table className="w-full table-fixed text-sm">
                     <colgroup>
@@ -341,7 +348,7 @@ export default async function BookingDetail({
                       <col />
                       <col className="w-[44px]" />
                     </colgroup>
-                    <thead className="bg-slate-50 text-slate-500 text-left">
+                    <thead className="sticky top-0 z-[1] bg-slate-50 text-slate-500 text-left shadow-[0_1px_0_#e2e8f0]">
                       <tr>
                         <th className="px-4 py-3 font-medium">#</th>
                         <th className="px-4 py-3 font-medium text-right">
@@ -428,7 +435,7 @@ export default async function BookingDetail({
             </CollapsibleCard>
           </div>
 
-          <aside className="space-y-4 self-start xl:h-[calc(100vh-100px)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1 pb-24">
+          <aside className="space-y-4 self-start min-w-0 pb-8 xl:sticky xl:top-[84px]">
             
 
             {canReview && <ReviewActions bookingId={b.id} />}
@@ -445,7 +452,7 @@ export default async function BookingDetail({
                 />
               </div>
             )}
-            <div className="card p-5">
+            <div className="card relative p-5">
               <h3 className="text-sm font-semibold text-slate-900">
                 Submission
               </h3>

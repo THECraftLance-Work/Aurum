@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
-  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
 
   const own = ["SM", "CP"].includes(user.role);
 
@@ -65,23 +66,55 @@ export default async function DashboardPage() {
 
   // Fall back to computing from the rows we already have if the aggregate RPC
   // is unavailable (e.g. migration 0002 not yet applied, or a transient error).
-  // A failed KPI tile must not take down the whole dashboard.
+  // A failed KPI tile must not take down the whole dashboard — especially for
+  // ACCOUNTANT where RLS / project scoping could otherwise blank the page.
   let s = ((statsResRaw as any)?.data ?? null) as Record<string, number> | null;
   if (!s) {
-    let aq: any = supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status, project_id");
-    if (own) aq = aq.eq("created_by", user.id);
-    if (projectId) aq = aq.eq("project_id", projectId);
-    const { data: agg } = await aq.limit(1000);
-    const a = agg ?? [];
-    s = {
-      total_bookings: a.length,
-      total_value: a.reduce((t: number, r: any) => t + Number(r.total_property_value ?? 0), 0),
-      total_received: a.reduce((t: number, r: any) => t + Number(r.total_amount_paid ?? 0), 0),
-      total_pending: a.reduce((t: number, r: any) => t + Number(r.remaining_balance ?? 0), 0),
-      pending_verification: a.filter((r: any) => ["SUBMITTED", "UNDER_REVIEW", "UPDATED"].includes(r.status)).length,
-      approved_count: a.filter((r: any) => r.status === "APPROVED").length,
-      rejected_count: a.filter((r: any) => r.status === "REJECTED").length
-    };
+    try {
+      let aq: any = supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status, project_id");
+      if (own) aq = aq.eq("created_by", user.id);
+      if (projectId) {
+        try { aq = aq.eq("project_id", projectId); } catch {}
+      }
+      const { data: agg, error: aggErr } = await aq.limit(1000);
+      if (aggErr) throw aggErr;
+      const a = agg ?? [];
+      s = {
+        total_bookings: a.length,
+        total_value: a.reduce((t: number, r: any) => t + Number(r.total_property_value ?? 0), 0),
+        total_received: a.reduce((t: number, r: any) => t + Number(r.total_amount_paid ?? 0), 0),
+        total_pending: a.reduce((t: number, r: any) => t + Number(r.remaining_balance ?? 0), 0),
+        pending_verification: a.filter((r: any) => ["SUBMITTED", "UNDER_REVIEW", "UPDATED"].includes(r.status)).length,
+        approved_count: a.filter((r: any) => r.status === "APPROVED").length,
+        rejected_count: a.filter((r: any) => r.status === "REJECTED").length
+      };
+    } catch {
+      // Last resort: count what we already fetched so dashboard never crashes
+      const a = (bookingsRes as any)?.data ?? [];
+      try {
+        const { data: fallback } = await supabase.from("bookings").select("total_property_value, total_amount_paid, remaining_balance, status").limit(1000);
+        const fa = fallback ?? a;
+        s = {
+          total_bookings: fa.length,
+          total_value: fa.reduce((t: number, r: any) => t + Number(r.total_property_value ?? 0), 0),
+          total_received: fa.reduce((t: number, r: any) => t + Number(r.total_amount_paid ?? 0), 0),
+          total_pending: fa.reduce((t: number, r: any) => t + Number(r.remaining_balance ?? 0), 0),
+          pending_verification: fa.filter((r: any) => ["SUBMITTED", "UNDER_REVIEW", "UPDATED"].includes(r.status)).length,
+          approved_count: fa.filter((r: any) => r.status === "APPROVED").length,
+          rejected_count: fa.filter((r: any) => r.status === "REJECTED").length
+        };
+      } catch {
+        s = {
+          total_bookings: a.length,
+          total_value: 0,
+          total_received: 0,
+          total_pending: 0,
+          pending_verification: 0,
+          approved_count: 0,
+          rejected_count: 0
+        };
+      }
+    }
   }
 
   const bookings = bookingsRes.data ?? [];

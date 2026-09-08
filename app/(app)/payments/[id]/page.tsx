@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { reportMissedRecordAccess } from "@/lib/security/access-alert";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -73,12 +73,13 @@ export default async function PaymentDetail({ params }: { params: Promise<{ id: 
   }
 
   const booking: any = Array.isArray(p.booking) ? p.booking[0] : p.booking;
-  const projectId = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const rawProject = (await cookies()).get("srivaraha_project")?.value ?? null;
+  const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
   const ownerProjectId = (p as any).project_id ?? booking?.project_id ?? (booking as any)?.project_id ?? null;
-  // payment itself or its booking carries project_id – enforce isolation
+  // Project switch while on detail: redirect to list instead of 404 (same as bookings)
   if (projectId && ownerProjectId && ownerProjectId !== projectId) {
     await reportMissedRecordAccess({ table: "payments", recordId: id, actor: user, path: `/payments/${id} (project_mismatch:${ownerProjectId}!=${projectId})` });
-    notFound();
+    redirect("/payments");
   }
   const dir = await resolveDirectory([p.submitted_by, p.reviewed_by]);
   const submitter = p.submitted_by ? dir.get(p.submitted_by) ?? null : null;

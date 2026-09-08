@@ -2,8 +2,31 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
-export default function CollapsibleCard({ title, children, defaultOpen = true, right }: { title: string; children: React.ReactNode; defaultOpen?: boolean; right?: React.ReactNode }) {
+export default function CollapsibleCard({
+  title,
+  children,
+  defaultOpen = true,
+  right,
+  collapsible = true,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  right?: React.ReactNode;
+  collapsible?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
+  if (!collapsible) {
+    return (
+      <div className="card p-0 overflow-hidden">
+        <div className="flex w-full items-center justify-between px-5 py-4">
+          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+          {right ? <span className="flex items-center gap-2">{right}</span> : null}
+        </div>
+        <div className="px-5 pb-5 pt-0">{children}</div>
+      </div>
+    );
+  }
   return (
     <div className="card p-0 overflow-hidden">
       <button type="button" onClick={() => setOpen(v => !v)} className="flex w-full items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors">

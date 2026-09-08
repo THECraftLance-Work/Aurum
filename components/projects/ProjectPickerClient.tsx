@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Trash2, Edit3 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 
 export default function ProjectPickerClient({ projects, isAdmin, isDirector }: { projects: any[]; isAdmin: boolean; isDirector?: boolean }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [current, setCurrent] = useState<string | null>(null);
   const [name, setName] = useState(""); const [slug, setSlug] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
@@ -13,6 +15,8 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
   const [editFields, setEditFields] = useState({ saleable_area: "", carpet_area: "", external_walls_area: "", balcony_utility_area: "", common_area: "", base_price: "", floor_rise_charges: "", east_facing_charges: "", premium_view_charges: "", amenities_charges: "", car_parking_charges: "", legal_documentation_charges: "", sale_consideration_per_sqft: "" });
   const [deleting, setDeleting] = useState<any | null>(null);
   const [delSlug, setDelSlug] = useState(""); const [delConfirm, setDelConfirm] = useState(""); const [delPw, setDelPw] = useState(""); const [delOtp, setDelOtp] = useState(""); const [otpSent, setOtpSent] = useState(false);
+  const [deletingBusy, setDeletingBusy] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const refreshCurrent = () => {
@@ -33,7 +37,9 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
   }, []);
   function select(id: string) {
     document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=31536000`;
+    document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
     localStorage.setItem("srivaraha_project", id);
+    try { localStorage.setItem("srivaraha_onboarded", "1"); } catch {}
     setCurrent(id);
     window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: id }));
     router.refresh();
@@ -42,7 +48,8 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
   async function create() {
     const res = await fetch("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, slug, parent_slug: "sri-varaha" }) });
     const j = await res.json().catch(()=> ({}));
-    if (!res.ok) return alert(j.error ?? "Failed");
+    if (!res.ok) { toast({ title: j.error ?? "Failed to create project", tone: "error" }); return; }
+    toast({ title: "Project created", tone: "success" });
     setName(""); setSlug(""); router.refresh();
   }
   function startEdit(p: any) {
@@ -71,31 +78,53 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
     Object.entries(editFields).forEach(([k,v]) => { if (String(v).trim() !== "") areas[k] = Number(v); });
     const res = await fetch(`/api/projects/${editing.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ default_sale_consideration: editSale ? Number(editSale) : null, default_areas: areas }) });
     const j = await res.json().catch(()=> ({}));
-    if (!res.ok) return alert(j.error ?? "Failed");
+    if (!res.ok) { toast({ title: j.error ?? "Failed to save", tone: "error" }); return; }
+    toast({ title: "Defaults updated", tone: "success" });
     setEditing(null); router.refresh();
   }
   async function sendDeleteOtp() {
-    if (!deleting) return;
-    const res = await fetch(`/api/projects/${deleting.id}/delete-otp`, { method: "POST" });
-    const j = await res.json().catch(()=> ({}));
-    if (!res.ok) return alert(j.error ?? "Failed to send code");
-    setOtpSent(true);
-    alert(`Code sent to your email — check inbox for ${deleting.name}`);
+    if (!deleting || otpSending) return;
+    setOtpSending(true);
+    try {
+      const res = await fetch(`/api/projects/${deleting.id}/delete-otp`, { method: "POST" });
+      const j = await res.json().catch(()=> ({}));
+      if (!res.ok) { toast({ title: j.error ?? "Failed to send code", tone: "error" }); return; }
+      setOtpSent(true);
+      toast({ title: "Code sent", description: `Check inbox for ${deleting.name} — valid 10 min`, tone: "success" });
+    } finally {
+      setOtpSending(false);
+    }
   }
   async function doDelete() {
-    if (!deleting) return;
-    if (delSlug.trim() !== deleting.slug) return alert("Slug mismatch");
-    if (delConfirm.trim() !== "DELETE") return alert("Type DELETE");
+    if (!deleting || deletingBusy) return;
+    // slug check is case-insensitive — user typing VAARHA vs vaarha should not mismatch
+    if (delSlug.trim().toLowerCase() !== deleting.slug.toLowerCase()) { toast({ title: "Slug mismatch", description: `Type "${deleting.slug}" exactly (case-insensitive)`, tone: "error" }); return; }
+    if (delConfirm.trim() !== "DELETE") { toast({ title: "Type DELETE to confirm", tone: "error" }); return; }
     // Director Google uses OTP, EMAIL uses password — send whichever is filled
-    const payload: any = { slug: delSlug, confirmText: delConfirm };
+    const payload: any = { slug: deleting.slug, confirmText: delConfirm };
     if (delOtp) payload.otp = delOtp;
     if (delPw) payload.password = delPw;
-    if (!payload.otp && !payload.password) return alert("Enter code from email or password");
-    const res = await fetch(`/api/projects/${deleting.id}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-    const j = await res.json().catch(()=> ({}));
-    if (!res.ok) return alert(j.error ?? "Failed");
-    alert("Project deleted — all data emailed to you. Accounts remain.");
-    setDeleting(null); setDelSlug(""); setDelConfirm(""); setDelPw(""); setDelOtp(""); setOtpSent(false); router.refresh();
+    if (!payload.otp && !payload.password) { toast({ title: "Enter code from email or password", tone: "error" }); return; }
+    setDeletingBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${deleting.id}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      const j = await res.json().catch(()=> ({}));
+      if (!res.ok) { toast({ title: j.error ?? "Failed to delete project", tone: "error" }); return; }
+      toast({ title: "Project deleted", description: "All data emailed to you. Accounts remain.", tone: "success" });
+      const wasCurrent = current === deleting.id;
+      setDeleting(null); setDelSlug(""); setDelConfirm(""); setDelPw(""); setDelOtp(""); setOtpSent(false);
+      // if deleted project was selected, clear selection and update header fast
+      if (wasCurrent) {
+        document.cookie = `srivaraha_project=; path=/; max-age=0`;
+        try { localStorage.removeItem("srivaraha_project"); } catch {}
+        setCurrent(null);
+        window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: "" }));
+        window.dispatchEvent(new StorageEvent("storage", { key: "srivaraha_project", newValue: "" } as any));
+      }
+      router.refresh();
+    } finally {
+      setDeletingBusy(false);
+    }
   }
   const company = projects.find((p: any) => p.slug === "sri-varaha");
   const items = projects.filter((p: any) => p.slug !== "sri-varaha");
@@ -184,22 +213,24 @@ export default function ProjectPickerClient({ projects, isAdmin, isDirector }: {
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border animate-rm-in">
             <h3 className="font-semibold text-rose-700">Delete {deleting.name}?</h3>
             <p className="text-sm text-slate-600 mt-1">Director verification: type slug, type DELETE, then send a 6-digit code to your email. Accounts remain — only project data is removed and emailed to you for audit.</p>
-            <label className="label mt-3">Type slug <span className="font-mono bg-slate-100 px-1 rounded">{deleting.slug}</span> to confirm</label>
-            <input className="input" value={delSlug} onChange={e=> setDelSlug(e.target.value)} placeholder={deleting.slug} autoComplete="off" />
-            <label className="label mt-3">Type DELETE</label>
-            <input className="input" value={delConfirm} onChange={e=> setDelConfirm(e.target.value)} placeholder="DELETE" autoComplete="off" />
+            <label className="text-xs font-medium text-slate-700 mt-3 block normal-case tracking-normal">Type slug <span className="font-mono bg-slate-100 px-1 rounded normal-case">{deleting.slug}</span> to confirm</label>
+            <input className="input mt-1" value={delSlug} onChange={e=> setDelSlug(e.target.value)} placeholder={deleting.slug} autoComplete="off" />
+            <label className="text-xs font-medium text-slate-700 mt-3 block normal-case tracking-normal">Type DELETE</label>
+            <input className="input mt-1" value={delConfirm} onChange={e=> setDelConfirm(e.target.value)} placeholder="DELETE" autoComplete="off" />
             <div className="mt-4 flex items-center gap-2">
-              <button onClick={sendDeleteOtp} type="button" className="btn-secondary border-[#ec3013]/20 bg-red-50 text-[#ec3013] hover:bg-red-100 hover:border-[#ec3013]/30 text-xs font-semibold">
-                {otpSent ? "Resend code" : "Send code to email"}
+              <button onClick={sendDeleteOtp} disabled={otpSending} type="button" className="btn-secondary border-[#ec3013]/20 bg-red-50 text-[#ec3013] hover:bg-red-100 hover:border-[#ec3013]/30 text-xs font-semibold disabled:opacity-50">
+                {otpSending ? "Sending…" : otpSent ? "Resend code" : "Send code to email"}
               </button>
               {otpSent && <span className="text-xs font-medium text-emerald-600">✓ Code sent (valid 10 min)</span>}
             </div>
-            <label className="label mt-4">Code from email (Google Director) or password (Email Director)</label>
+            <label className="text-xs font-medium text-slate-700 mt-4 block normal-case tracking-normal">Code from email (Google Director) or password (Email Director)</label>
             <input className="input" value={delOtp} onChange={e=> setDelOtp(e.target.value)} placeholder="6-digit code" inputMode="numeric" maxLength={6} />
             <input className="input mt-2" type="password" value={delPw} onChange={e=> setDelPw(e.target.value)} placeholder="Or password if Email account" />
             <div className="mt-6 flex justify-end gap-2">
-              <button onClick={()=> { setDeleting(null); setOtpSent(false); }} className="btn-secondary">Cancel</button>
-              <button onClick={doDelete} className="btn-danger">Delete permanently</button>
+              <button onClick={()=> { setDeleting(null); setOtpSent(false); }} disabled={deletingBusy} className="btn-secondary disabled:opacity-50">Cancel</button>
+              <button onClick={doDelete} disabled={deletingBusy} className="btn-danger disabled:opacity-50 min-w-[148px]">
+                {deletingBusy ? "Deleting…" : "Delete permanently"}
+              </button>
             </div>
           </div>
         </div>,

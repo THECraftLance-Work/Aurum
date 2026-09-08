@@ -59,7 +59,9 @@ export default function Sidebar({
   }, []);
   function selectProject(id: string) {
     document.cookie = `srivaraha_project=${encodeURIComponent(id)}; path=/; max-age=31536000`;
+    document.cookie = `srivaraha_onboarded=1; path=/; max-age=315360000`;
     localStorage.setItem("srivaraha_project", id);
+    try { localStorage.setItem("srivaraha_onboarded", "1"); } catch {}
     setCurrentProject(id);
     setProjectOpen(false);
     window.dispatchEvent(new CustomEvent("srivaraha:project", { detail: id }));

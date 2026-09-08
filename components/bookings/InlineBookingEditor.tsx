@@ -1,12 +1,12 @@
 "use client";
 import { useBookingEdit } from "./BookingEditProvider";
+import CollapsibleCard from "@/components/ui/CollapsibleCard";
 
 export default function InlineBookingEditor({ booking }: { booking: any }) {
   const { editing, form, update, error } = useBookingEdit();
   return (
     <>
-      <div className="card p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Property</h3>
+      <CollapsibleCard title="Property" defaultOpen={true}>
         {editing ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Project *" value={form.project_name} onChange={(v) => update("project_name", v)} />
@@ -24,10 +24,9 @@ export default function InlineBookingEditor({ booking }: { booking: any }) {
             <Info label="Details" value={booking.property_details ?? "—"} span />
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div className="card p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Booking form details</h3>
+      <CollapsibleCard title="Booking form details" defaultOpen={true}>
         {editing ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Sales representative" value={form.sales_representative} onChange={(v) => update("sales_representative", v)} />
@@ -67,7 +66,7 @@ export default function InlineBookingEditor({ booking }: { booking: any }) {
             {booking.notes && <Info label="Notes" value={booking.notes} span />}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       {editing && error && <p className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">{error}</p>}
     </>
   );
