@@ -188,7 +188,7 @@ export default async function PublicBookingPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">Aurum Real Estate · Booking {b.booking_id} · Unique ID {b.id}</footer>
+      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">Sree Varaaha Real Estate · Booking {b.booking_id} · Unique ID {b.id}</footer>
     </div>
   );
 }

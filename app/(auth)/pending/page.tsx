@@ -30,7 +30,7 @@ export default async function PendingPage() {
       <p className="mt-2 text-xs text-neutral-600 leading-relaxed">
         {profile.status === "REJECTED"
           ? "Your access request was declined. Please contact your platform administrator."
-          : "Access is provisioned after an Aurum Director approves your requested role. This page updates in real-time."}
+          : "Access is provisioned after a Sree Varaaha Director approves your requested role. This page updates in real-time."}
       </p>
 
       <div className="mt-6 border-t-2 border-[var(--color-divider)] pt-2 text-sm">

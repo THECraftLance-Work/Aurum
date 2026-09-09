@@ -89,7 +89,7 @@ export default function ProjectAssignSelect({ userId, initialProjectId = null, c
           ))}
         </select>
         <div className="mt-1 text-[11px] text-slate-500">
-          {value ? <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-3 w-3" /> Auto-redirects on next login</span> : "User will see Sri Varaha picker after login"}
+          {value ? <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-3 w-3" /> Auto-redirects on next login</span> : "User will see Sree Varaaha picker after login"}
         </div>
       </div>
       {saving && <span className="text-xs text-slate-400">Saving…</span>}

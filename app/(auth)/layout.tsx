@@ -12,7 +12,7 @@ export default function AuthLayout({
         <div>
           <img
             src="/APP_LOGO.png"
-            alt="Aurum Real Estate"
+            alt="Sree Varaaha Real Estate"
             className="h-30 w-full object-cover"
           />
         </div>
@@ -70,7 +70,7 @@ export default function AuthLayout({
             <div className="mb-20  flex justify-center lg:hidden">
               <img
                 src="/APP_LOGO.png"
-                alt="Aurum Real Estate"
+                alt="Sree Varaaha Real Estate"
                 className="h-50 w-full object-cover"
               />
             </div>

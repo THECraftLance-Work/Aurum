@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import OfflineBanner from "@/components/ui/OfflineBanner";
 
 export const metadata: Metadata = {
-  title: "Aurum — Real Estate Operations",
-  description: "Internal operations platform for Aurum Real Estate.",
+  title: "Sree Varaaha — Real Estate Operations",
+  description: "Internal operations platform for Sree Varaaha Real Estate.",
   icons: { icon: "/favicon.svg" }
 };
 

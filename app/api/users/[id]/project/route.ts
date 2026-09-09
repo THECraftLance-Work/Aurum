@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { data: proj } = await admin.from("projects").select("id, slug, name, is_active").eq("id", projectId).maybeSingle();
     if (!proj) return NextResponse.json({ error: "Project not found" }, { status: 404 });
     if (!proj.is_active) return NextResponse.json({ error: "Project is not active" }, { status: 400 });
-    if (proj.slug === "sri-varaha") return NextResponse.json({ error: "Cannot assign parent Sri Varaha" }, { status: 400 });
+    if (proj.slug === "sri-varaha") return NextResponse.json({ error: "Cannot assign parent Sree Varaaha" }, { status: 400 });
   }
 
   const { data: target } = await admin.from("app_users").select("id, role, assigned_project_id").eq("id", id).maybeSingle();

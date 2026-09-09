@@ -20,7 +20,7 @@ export default function ProjectSwitcher() {
   if (!projects.length) return null;
   return (
     <select value={current} onChange={onChange} className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-medium">
-      <option value="">SRIVARAHA / Projects</option>
+      <option value="">SREE VARAAHA / Projects</option>
       {projects.map(p=> <option key={p.id} value={p.id}>{p.name}</option>)}
     </select>
   );

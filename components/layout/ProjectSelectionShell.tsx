@@ -81,7 +81,7 @@ export default function ProjectSelectionShell({
         open={confirmSignOut}
         busy={signingOut}
         tone="primary"
-        title="Sign out of Aurum?"
+        title="Sign out of Sree Varaaha?"
         message={<>You are signed in as <span className="font-medium">{user.name}</span>.</>}
         confirmLabel="Sign out"
         onConfirm={signOut}

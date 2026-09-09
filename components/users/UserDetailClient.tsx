@@ -302,7 +302,7 @@ export default function UserDetailClient({
                     <Shield className="h-3 w-3" />{" "}
                     {user.auth_provider === "GOOGLE"
                       ? "Verified by Google"
-                      : "Verified by Aurum System"}
+                      : "Verified by Sree Varaaha System"}
                   </span>
                 </p>
               </div>
@@ -733,7 +733,7 @@ export default function UserDetailClient({
 
       {!embedded && (
         <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
-          Aurum Real Estate Operations · Internal profile — Admin and Director access only
+          Sree Varaaha Real Estate Operations · Internal profile — Admin and Director access only
         </footer>
       )}
     </div>

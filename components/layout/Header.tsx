@@ -50,7 +50,7 @@ export default function Header({ user }: { user: SessionUser }) {
           if (pid && notification.project_id && notification.project_id !== pid) return;
           if (!isNotificationCategoryEnabled(notification.category ?? "")) return;
           if (["HIGH", "URGENT"].includes(notification.priority ?? "")) playNotificationSound();
-          showBrowserNotification(notification.title ?? "Aurum notification", notification.message ?? "You have a new update.");
+          showBrowserNotification(notification.title ?? "Sree Varaaha notification", notification.message ?? "You have a new update.");
         })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${user.id}` },
@@ -148,7 +148,7 @@ export default function Header({ user }: { user: SessionUser }) {
         open={confirmSignOut}
         busy={signingOut}
         tone="primary"
-        title="Sign out of Aurum?"
+        title="Sign out of Sree Varaaha?"
         message={
           <>
             You are signed in as <span className="font-medium">{user.name}</span>.

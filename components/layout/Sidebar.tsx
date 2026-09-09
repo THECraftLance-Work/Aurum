@@ -88,7 +88,7 @@ export default function Sidebar({
   const activeProj = projects.find((p: any) => p.id === currentProject);
   useEffect(() => {
     const logo = activeProj?.logo_url;
-    document.title = activeProj ? `${activeProj.name} — Real Estate Operations` : "Aurum — Real Estate Operations";
+    document.title = activeProj ? `${activeProj.name} — Real Estate Operations` : "Sree Varaaha — Real Estate Operations";
     let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
     if (!link) {
       link = document.createElement("link");
@@ -97,7 +97,7 @@ export default function Sidebar({
     }
     link.href = logo || "/favicon.svg";
   }, [activeProj]);
-  const currentProjectName = activeProj ? activeProj.name : isPrivileged ? "All Projects (Sri Varaha)" : "Select project";
+  const currentProjectName = activeProj ? activeProj.name : isPrivileged ? "All Projects (Sree Varaaha)" : "Select project";
   const accent = roleAccent[user.role];
   const items = NAV.filter((i) => i.roles.includes(user.role));
   const primaryItems = items.slice(0, 4);
@@ -130,7 +130,7 @@ export default function Sidebar({
               {activeProj?.logo_url ? <img src={activeProj.logo_url} alt="" className="h-full w-full object-contain" /> : <Building2 className="h-4 w-4" />}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold leading-tight text-white truncate">{activeProj?.name ?? "Sri Varaha Operations"}</div>
+              <div className="text-sm font-semibold leading-tight text-white truncate">{activeProj?.name ?? "Sree Varaaha Operations"}</div>
               <div className="text-[11px] leading-tight text-white/70 truncate">{activeProj?.parent_id ? "Sub-project" : "Workspace"} • {currentProjectName}</div>
             </div>
             <ChevronDown className={`h-4 w-4 text-white/70 shrink-0 transition-transform ${projectOpen ? "rotate-180" : ""}`} />

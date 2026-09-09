@@ -24,7 +24,7 @@ export default async function SriVarahaProjectsPage() {
           <div className="pointer-events-none absolute -bottom-32 right-32 h-52 w-52 rounded-full bg-cyan-400/20 blur-3xl" />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="text-xs font-semibold tracking-[0.2em] text-white/75">SRIVARAHA / PROJECTS</div>
+              <div className="text-xs font-semibold tracking-[0.2em] text-white/75">SREE VARAAHA / PROJECTS</div>
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">Choose <span className="bg-gradient-to-r from-[#DDE4FF] to-[#B9C5FF] bg-clip-text text-transparent">Your Project</span></h1>
               <p className="mt-2 max-w-2xl text-sm leading-5 text-white/85">Dashboards, bookings and payments are isolated per project. SM / CP / Accountant work per-project, Admin & Director see all. Select a project to continue — you’ll be taken to its dashboard.</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-white/90">
@@ -33,7 +33,7 @@ export default async function SriVarahaProjectsPage() {
             </div>
             <div className="relative rounded-xl bg-white px-4 py-3 text-[#172033] shadow-[0_2px_8px_rgba(15,23,42,0.08)]">
               <div className="text-xs text-[#64748B]">Current workspace</div>
-              <div className="mt-1 text-sm font-semibold">{parent?.name ?? "Sri Varaha"}</div>
+              <div className="mt-1 text-sm font-semibold">{parent?.name ?? "Sree Varaaha"}</div>
               <div className="text-xs text-[#64748B]">{children.length + orphans.length} active projects</div>
             </div>
           </div>

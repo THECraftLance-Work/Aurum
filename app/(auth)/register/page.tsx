@@ -33,7 +33,7 @@ export default async function RegisterPage() {
           Request platform access
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Every registration is reviewed by an Aurum Director before access is provisioned.
+          Every registration is reviewed by a Sree Varaaha Director before access is provisioned.
         </p>
       </div>
 
