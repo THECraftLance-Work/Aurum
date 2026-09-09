@@ -174,7 +174,7 @@ export default async function DashboardPage() {
           {bookings.length === 0 ? (
             <EmptyState title="No bookings yet" description="Create a new booking to see it here." />
           ) : (
-            <div className="max-h-[55vh] overflow-y-auto overscroll-contain">
+            <div className="overflow-y-visible overscroll-contain 2xl:max-h-[55vh] 2xl:overflow-y-auto">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[130px]" />
@@ -226,7 +226,7 @@ export default async function DashboardPage() {
           {recentPayments.length === 0 ? (
             <EmptyState title="No payments" description="Payments will appear here." />
           ) : (
-            <ul className="max-h-[50vh] divide-y divide-border overflow-y-auto overscroll-contain">
+            <ul className="divide-y divide-border overscroll-contain 2xl:max-h-[50vh] 2xl:overflow-y-auto">
               {recentPayments.map((p: any) => (
                 <li key={p.id}>
                   <Link href={`/payments/${p.id}`} className="block px-5 py-3.5 transition-colors hover:bg-slate-50">
