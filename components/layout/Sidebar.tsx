@@ -86,6 +86,17 @@ export default function Sidebar({
   const subProjects = projects.filter((p: any) => p.slug !== "sri-varaha");
   const isPrivileged = ["ADMIN", "DIRECTOR"].includes(user.role);
   const activeProj = projects.find((p: any) => p.id === currentProject);
+  useEffect(() => {
+    const logo = activeProj?.logo_url;
+    document.title = activeProj ? `${activeProj.name} — Real Estate Operations` : "Aurum — Real Estate Operations";
+    let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = logo || "/favicon.svg";
+  }, [activeProj]);
   const currentProjectName = activeProj ? activeProj.name : isPrivileged ? "All Projects (Sri Varaha)" : "Select project";
   const accent = roleAccent[user.role];
   const items = NAV.filter((i) => i.roles.includes(user.role));
@@ -115,8 +126,8 @@ export default function Sidebar({
       <div className="flex items-center justify-between px-2 py-5 gap-2">
         <div className="relative flex-1">
           <button onClick={()=> setProjectOpen(v=>!v)} className="flex w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-900 px-3 py-2.5 text-left hover:bg-slate-800 transition-colors">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-white shrink-0">
-              <Building2 className="h-4 w-4" />
+            <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-white shrink-0 overflow-hidden">
+              {activeProj?.logo_url ? <img src={activeProj.logo_url} alt="" className="h-full w-full object-contain" /> : <Building2 className="h-4 w-4" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold leading-tight text-white truncate">{activeProj?.name ?? "Sri Varaha Operations"}</div>

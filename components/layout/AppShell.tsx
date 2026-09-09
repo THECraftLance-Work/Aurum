@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { SessionUser } from "@/lib/auth/session";
 import PageMotion from "./PageMotion";
+import ProjectSelectionShell from "./ProjectSelectionShell";
 
 export default function AppShell({
   user,
@@ -16,6 +18,28 @@ export default function AppShell({
   pendingVerification?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const [isProjectSelection, setIsProjectSelection] = useState(pathname === "/projects");
+
+  useEffect(() => {
+    if (pathname !== "/projects") {
+      setIsProjectSelection(false);
+      return;
+    }
+    const hasSelectedProject = document.cookie
+      .split("; ")
+      .some((cookie) => cookie.startsWith("srivaraha_project=") && cookie.slice("srivaraha_project=".length).length > 0);
+    setIsProjectSelection(!hasSelectedProject);
+  }, [pathname]);
+
+  if (isProjectSelection) {
+    return (
+      <ToastProvider>
+        <ProjectSelectionShell user={user}>{children}</ProjectSelectionShell>
+      </ToastProvider>
+    );
+  }
+
   return (
     <ToastProvider>
       <div className="flex h-screen overflow-hidden bg-bg">

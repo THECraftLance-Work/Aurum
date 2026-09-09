@@ -6,7 +6,6 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import UserActionRow from "@/components/users/UserActionRow";
 import DeleteUserButton from "@/components/users/DeleteUserButton";
-import ProjectAssignSelect from "@/components/users/ProjectAssignSelect";
 import { formatDate, roleAccent, roleLabels } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import AddEmployeeButton from "@/components/users/AddEmployeeButton";
@@ -21,6 +20,11 @@ export default async function UsersPage() {
     .select("id, name, email, role, status, auth_provider, created_at, assigned_project_id")
     .order("created_at", { ascending: false })
     .limit(500);
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, slug")
+    .eq("is_active", true);
+  const projectNames = new Map((projects ?? []).map((project: any) => [project.id, project.name]));
 
   const isDirector = currentUser.role === "DIRECTOR";
 
@@ -37,7 +41,6 @@ export default async function UsersPage() {
               <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium">Provider</th>
               <th className="px-5 py-3 font-medium">Joined</th>
-              <th className="px-5 py-3 font-medium text-right">Assigned Project</th>
               <th className="px-5 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
@@ -58,6 +61,15 @@ export default async function UsersPage() {
                           {isSelf && <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-normal">You</span>}
                         </div>
                         <div className="text-xs text-slate-500 group-hover:text-slate-700">{u.email}</div>
+                        <div className="mt-1 text-[11px] font-medium text-slate-400">
+                          Project: <span className="text-slate-600">
+                            {["ADMIN", "DIRECTOR"].includes(u.role)
+                              ? "All Projects"
+                              : u.assigned_project_id
+                                ? projectNames.get(u.assigned_project_id) ?? "Selected project"
+                                : "No project selected"}
+                          </span>
+                        </div>
                       </div>
                     </Link>
                   </td>
@@ -67,15 +79,6 @@ export default async function UsersPage() {
                   <td className="px-5 py-3"><StatusBadge status={u.status} /></td>
                   <td className="px-5 py-3 text-slate-500">{u.auth_provider}</td>
                   <td className="px-5 py-3 text-slate-500">{formatDate(u.created_at)}</td>
-                  <td className="px-5 py-3 text-right">
-                    {["ADMIN", "DIRECTOR"].includes(u.role) ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">
-                        All Projects
-                      </span>
-                    ) : (
-                      <ProjectAssignSelect userId={u.id} initialProjectId={u.assigned_project_id ?? null} compact />
-                    )}
-                  </td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/users/${u.id}`} title="Open profile (director view, Unique ID)" className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">

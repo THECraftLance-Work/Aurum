@@ -89,13 +89,13 @@ export default function RaiseTicketModal({ open, onClose }: { open: boolean; onC
   }
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-stretch justify-end" role="dialog" aria-modal="true" aria-label="Raise a support ticket">
-      <div className="absolute inset-0 bg-slate-900/40 animate-fade-in" onClick={() => !busy && onClose()} />
+    <div className="fixed inset-0 z-[120] flex items-stretch justify-end" role="dialog" aria-modal="true" aria-label="Raise a support ticket">
+      <div className="absolute inset-0 z-0 bg-slate-900/40 animate-fade-in" onClick={() => !busy && onClose()} />
       <form
         onSubmit={submit}
-        className="relative h-full w-full max-w-lg overflow-y-auto border-l border-border bg-white shadow-pop animate-slide-in-right"
+        className="relative z-10 flex h-full min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-border bg-white shadow-pop animate-slide-in-right"
       >
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-border bg-white px-5 py-4">
           <div className="flex items-center gap-2.5">
             <div className="grid h-8 w-8 place-items-center rounded-xl bg-accent-light text-accent">
               <LifeBuoy className="h-4 w-4" />
@@ -110,7 +110,7 @@ export default function RaiseTicketModal({ open, onClose }: { open: boolean; onC
           </button>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           <div>
             <label className="label" htmlFor="tkt-subject">Subject</label>
             <input
@@ -166,7 +166,7 @@ export default function RaiseTicketModal({ open, onClose }: { open: boolean; onC
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary h-10">Cancel</button>
           <button type="submit" disabled={!valid || busy} className={cn("btn-primary h-10")}>
             {busy ? "Submitting…" : "Raise ticket"}
