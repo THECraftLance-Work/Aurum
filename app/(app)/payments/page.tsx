@@ -32,7 +32,12 @@ const TABS = [
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; page?: string; booking?: string; plan?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    page?: string;
+    booking?: string;
+    plan?: string;
+  }>;
 }) {
   const user = await requireUser();
   const supabase = await createSupabaseServer();
@@ -41,8 +46,7 @@ export default async function PaymentsPage({
   const projectId = rawProject && rawProject.trim() ? rawProject.trim() : null;
   const scopeIds = await getProjectScopeIds(supabase, projectId);
 
-  const tab =
-    TABS.find((t) => t.key === (filters.tab ?? "ALL")) ?? TABS[0];
+  const tab = TABS.find((t) => t.key === (filters.tab ?? "ALL")) ?? TABS[0];
   const page = Math.max(1, Number(filters.page ?? 1) || 1);
   const from = (page - 1) * PAGE_SIZE;
 
@@ -70,8 +74,13 @@ export default async function PaymentsPage({
   if (filters.booking) q = q.eq("booking_id", filters.booking);
 
   // For booking filter dropdown — project-scoped
-  let bFilterQ: any = supabase.from("bookings").select("id, booking_id").order("created_at", { ascending: false }).limit(100);
-  if (["SM","CP"].includes(user.role)) bFilterQ = bFilterQ.eq("created_by", user.id);
+  let bFilterQ: any = supabase
+    .from("bookings")
+    .select("id, booking_id")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (["SM", "CP"].includes(user.role))
+    bFilterQ = bFilterQ.eq("created_by", user.id);
   if (scopeIds) bFilterQ = bFilterQ.in("project_id", scopeIds);
   const { data: filterBookings } = await bFilterQ;
 
@@ -80,16 +89,23 @@ export default async function PaymentsPage({
   // Filter by payment plan (One-Time vs Installment) if selected
   const filteredPayments = (rawPayments ?? []).filter((p: any) => {
     if (!filters.plan || filters.plan === "all") return true;
-    const isOneTime = Number(p.amount) >= Number(p.booking?.total_property_value ?? 0) || p.reference_no === "ONE_TIME" || p.reference_no === "FULL_PAYMENT";
+    const isOneTime =
+      Number(p.amount) >= Number(p.booking?.total_property_value ?? 0) ||
+      p.reference_no === "ONE_TIME" ||
+      p.reference_no === "FULL_PAYMENT";
     if (filters.plan === "one_time") return isOneTime;
     if (filters.plan === "installment") return !isOneTime;
     return true;
   });
 
-  const payments = filters.plan && filters.plan !== "all"
-    ? filteredPayments.slice(from, from + PAGE_SIZE)
-    : filteredPayments;
-  const total = filters.plan && filters.plan !== "all" ? filteredPayments.length : (count ?? 0);
+  const payments =
+    filters.plan && filters.plan !== "all"
+      ? filteredPayments.slice(from, from + PAGE_SIZE)
+      : filteredPayments;
+  const total =
+    filters.plan && filters.plan !== "all"
+      ? filteredPayments.length
+      : (count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const dir = await resolveDirectory(
     (payments ?? []).map((p: any) => p.submitted_by),
@@ -100,7 +116,8 @@ export default async function PaymentsPage({
     sp.set("tab", over.tab ?? tab.key);
     if (over.page) sp.set("page", over.page);
     if (over.plan ?? filters.plan) sp.set("plan", over.plan ?? filters.plan!);
-    if (over.booking ?? filters.booking) sp.set("booking", over.booking ?? filters.booking!);
+    if (over.booking ?? filters.booking)
+      sp.set("booking", over.booking ?? filters.booking!);
     return `/payments?${sp.toString()}`;
   };
 
@@ -111,39 +128,62 @@ export default async function PaymentsPage({
         description="Every payment entry and its verification status. Open one for the full transaction record."
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <TabNav
-            tabs={TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              href: href({ tab: t.key }),
-            }))}
-            active={tab.key}
-          />
-          {/* One-time vs Installment filter */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pt-5 pb-5">
+        <TabNav
+          tabs={TABS.map((t) => ({
+            key: t.key,
+            label: t.label,
+            href: href({ tab: t.key }),
+          }))}
+          active={tab.key}
+        />
+
+        <div className="flex gap-3">
           <div className="flex items-center rounded-xl border border-border bg-white p-1 text-xs font-medium shadow-sm">
             <Link
               href={href({ plan: "all" })}
-              className={cn("px-2.5 py-1 rounded-lg transition", (!filters.plan || filters.plan === "all") ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:text-slate-900")}
+              className={cn(
+                "rounded-lg px-2.5 py-1 transition",
+                !filters.plan || filters.plan === "all"
+                  ? "bg-slate-900 font-semibold text-white"
+                  : "text-slate-600 hover:text-slate-900",
+              )}
             >
               All Types
             </Link>
+
             <Link
               href={href({ plan: "one_time" })}
-              className={cn("px-2.5 py-1 rounded-lg transition", filters.plan === "one_time" ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:text-slate-900")}
+              className={cn(
+                "rounded-lg px-2.5 py-1 transition",
+                filters.plan === "one_time"
+                  ? "bg-slate-900 font-semibold text-white"
+                  : "text-slate-600 hover:text-slate-900",
+              )}
             >
               One-time
             </Link>
+
             <Link
               href={href({ plan: "installment" })}
-              className={cn("px-2.5 py-1 rounded-lg transition", filters.plan === "installment" ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:text-slate-900")}
+              className={cn(
+                "rounded-lg px-2.5 py-1 transition",
+                filters.plan === "installment"
+                  ? "bg-slate-900 font-semibold text-white"
+                  : "text-slate-600 hover:text-slate-900",
+              )}
             >
               Installment
             </Link>
           </div>
+
+          <div className="flex items-center">
+            <BookingFilter
+              bookings={filterBookings ?? []}
+              current={filters.booking}
+            />
+          </div>
         </div>
-        <BookingFilter bookings={filterBookings ?? []} current={filters.booking} />
       </div>
 
       <div className="card min-w-0 overflow-hidden p-0">
@@ -171,9 +211,9 @@ export default async function PaymentsPage({
                   <col className="w-[44px]" />
                 </colgroup>
 
-                <thead className="bg-slate-50 text-center   text-slate-500">
+                <thead className="bg-slate-50 text-slate-500">
                   <tr>
-                    <th className="whitespace-nowrap text-right  px-5 py-3 font-medium">
+                    <th className="whitespace-nowrap px-5 py-3 text-left font-medium">
                       Booking
                     </th>
 
@@ -181,19 +221,19 @@ export default async function PaymentsPage({
 
                     <th className="px-5 py-3 text-right font-medium">Amount</th>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-medium">
+                    <th className="whitespace-nowrap px-5 py-3 text-left font-medium">
                       Date
                     </th>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-medium">
+                    <th className="whitespace-nowrap px-5 py-3 text-left font-medium">
                       Mode
                     </th>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-medium">
+                    <th className="whitespace-nowrap px-5 py-3 text-left font-medium">
                       Status
                     </th>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-medium">
+                    <th className="whitespace-nowrap px-5 py-3 text-left font-medium">
                       Recorded by
                     </th>
 
@@ -235,10 +275,12 @@ export default async function PaymentsPage({
                         </td>
 
                         <td className="px-5 py-3 text-slate-600">
-                          <span className="block whitespace-nowrap">{formatDate(p.payment_date)}</span>
-                          <span className="mt-0.5 block whitespace-nowrap text-xs text-slate-400">
-                            Added {formatDateTime(p.created_at)}
+                          <span className="block whitespace-nowrap">
+                            {formatDate(p.payment_date)}
                           </span>
+                          {/* <span className="mt-0.5 block whitespace-nowrap text-xs text-slate-400">
+                            Added {formatDateTime(p.created_at)}
+                          </span> */}
                         </td>
 
                         <td className="min-w-0 px-4 py-5 text-slate-600">
@@ -288,7 +330,8 @@ export default async function PaymentsPage({
                           {bk?.booking_id ?? "—"}
                         </div>
                         <div className="truncate text-xs text-slate-500">
-                          {formatDate(p.payment_date)} · Added {formatDateTime(p.created_at)} ·{" "}
+                          {formatDate(p.payment_date)} · Added{" "}
+                          {formatDateTime(p.created_at)} ·{" "}
                           {p.payment_mode.replaceAll("_", " ")}
                         </div>
                         <div className="mt-1">

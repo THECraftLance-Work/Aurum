@@ -1,7 +1,13 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function BookingFilter({ bookings, current }: { bookings: { id: string; booking_id: string }[]; current?: string }) {
+export default function BookingFilter({
+  bookings,
+  current,
+}: {
+  bookings: { id: string; booking_id: string }[];
+  current?: string;
+}) {
   const router = useRouter();
   const sp = useSearchParams();
   function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -14,10 +20,17 @@ export default function BookingFilter({ bookings, current }: { bookings: { id: s
   }
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-slate-500">Booking:</span>
-      <select value={current ?? ""} onChange={onChange} className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs">
+      <select
+        value={current ?? ""}
+        onChange={onChange}
+        className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs"
+      >
         <option value="">All bookings</option>
-        {bookings.map(b => <option key={b.id} value={b.id}>{b.booking_id}</option>)}
+        {bookings.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.booking_id}
+          </option>
+        ))}
       </select>
     </div>
   );

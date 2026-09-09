@@ -42,7 +42,7 @@ export default function TabNav({
   return (
     <div
       className={cn(
-        "mb-4 flex w-fit max-w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-border bg-white p-1 shadow-card transition-opacity duration-150",
+        "flex w-fit max-w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-border bg-white p-1 shadow-card transition-opacity duration-150",
         pending && "opacity-70",
         className
       )}
